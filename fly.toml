@@ -52,4 +52,7 @@ primary_region = "iad"
 
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "1gb"
+  # 512 MB keeps this at roughly $3/month. Plenty for serving audio and
+  # analysing waveforms; if converting a big video ever gets killed, raise
+  # it with: fly scale memory 1024
+  memory = "512mb"
