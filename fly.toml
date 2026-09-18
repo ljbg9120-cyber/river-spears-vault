@@ -1,18 +1,30 @@
-# Deploy config for Fly.io (https://fly.io). Run `fly launch --no-deploy` once to
-# claim an app name, then `fly volumes create vault_data --size 10` and `fly deploy`.
-app = "vault"
+# Fly.io deployment for River Spears and the Crews Vault.
+#
+#   fly auth signup            # or: fly auth login
+#   fly launch --no-deploy     # claims the app name, keeps this file
+#   fly volumes create vault_data --size 10 --region iad
+#   fly secrets set VAULT_SECRET_KEY=... VAULT_PUBLIC_URL=https://<app>.fly.dev
+#   fly deploy
+#
+# The volume is the part that matters: the database, the uploaded audio, the
+# album covers and the video loops all live on it. Without one, every deploy
+# starts empty.
+
+app = "river-spears-vault"
 primary_region = "iad"
 
 [build]
   dockerfile = "Dockerfile"
 
+  [build.args]
+    # Automatic lyric syncing loads a Whisper model that wants ~2 GB of RAM,
+    # which a 1 GB machine will not survive. Off here; set it to "1" and raise
+    # the memory below to enable it. It always works locally either way.
+    WITH_AUTOSYNC = "0"
+
 [env]
   VAULT_DATA_DIR = "/data"
   VAULT_MAX_UPLOAD_MB = "200"
-  # Set this to your real URL once you know it:
-  #   fly secrets set VAULT_PUBLIC_URL=https://vault.fly.dev
-  #   fly secrets set VAULT_SECRET_KEY=$(python -c "import secrets;print(secrets.token_urlsafe(48))")
-  #   fly secrets set VAULT_GOOGLE_CLIENT_ID=...
 
 [mounts]
   source = "vault_data"
@@ -21,11 +33,23 @@ primary_region = "iad"
 [http_service]
   internal_port = 8000
   force_https = true
-  auto_stop_machines = "suspend"
+  # Never sleep. A shared link should play the moment someone opens it, not
+  # after a cold start.
+  auto_stop_machines = "off"
   auto_start_machines = true
   min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 40
+    hard_limit = 80
 
 [[http_service.checks]]
   path = "/api/health"
   interval = "30s"
   timeout = "5s"
+  grace_period = "20s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"
