@@ -1,0 +1,26 @@
+# One-click deploy config for Render (https://render.com).
+# Point Render at this repo and it reads everything below.
+services:
+  - type: web
+    name: vault
+    runtime: docker
+    plan: starter          # the free plan has no persistent disk; music needs one
+    healthCheckPath: /api/health
+    disk:
+      name: vault-data
+      mountPath: /data     # database + uploaded audio live here
+      sizeGB: 10
+    envVars:
+      - key: VAULT_SECRET_KEY
+        generateValue: true        # Render generates and stores it
+      - key: VAULT_DATA_DIR
+        value: /data
+      - key: VAULT_PUBLIC_URL
+        fromService:
+          type: web
+          name: vault
+          property: host           # becomes https://<your-app>.onrender.com
+      - key: VAULT_MAX_UPLOAD_MB
+        value: "200"
+      - key: VAULT_GOOGLE_CLIENT_ID
+        sync: false                # paste yours in the Render dashboard

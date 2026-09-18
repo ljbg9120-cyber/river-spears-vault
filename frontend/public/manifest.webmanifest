@@ -1,0 +1,14 @@
+{
+  "name": "River Spears and the Crews Vault",
+  "short_name": "River Spears",
+  "description": "Free, unlimited storage for unreleased music.",
+  "start_url": "/library",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08070d",
+  "theme_color": "#08070d",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

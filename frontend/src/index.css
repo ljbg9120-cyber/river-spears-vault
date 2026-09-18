@@ -1,0 +1,224 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Design tokens. --accent / --accent2 are rewritten at runtime from the user's
+   appearance settings, so every surface, glow and control re-tints at once.
+--------------------------------------------------------------------------- */
+:root {
+  --accent-rgb: 124 92 255;
+  --accent2-rgb: 34 211 238;
+  --ink-rgb: 244 243 255;
+  --muted-rgb: 150 148 178;
+  --bg-rgb: 8 7 13;
+  --panel: rgba(255, 255, 255, 0.045);
+  --panel-strong: rgba(255, 255, 255, 0.075);
+  --hairline: rgba(255, 255, 255, 0.1);
+  --shadow: rgba(0, 0, 0, 0.55);
+  --motion: 1;
+}
+
+:root[data-mode="light"] {
+  --ink-rgb: 22 20 38;
+  --muted-rgb: 104 102 130;
+  --bg-rgb: 246 245 252;
+  --panel: rgba(255, 255, 255, 0.66);
+  --panel-strong: rgba(255, 255, 255, 0.85);
+  --hairline: rgba(20, 18, 40, 0.1);
+  --shadow: rgba(40, 35, 80, 0.16);
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: rgb(var(--bg-rgb));
+  color: rgb(var(--ink-rgb));
+  font-family: Inter, system-ui, sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The animated background lives behind everything and never blocks clicks. */
+.bg-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: -50%;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.16;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  animation: grainshift 0.6s steps(3) infinite;
+}
+
+@keyframes grainshift {
+  0% { transform: translate(0, 0); }
+  33% { transform: translate(-2%, 1%); }
+  66% { transform: translate(1%, -2%); }
+  100% { transform: translate(0, 0); }
+}
+
+@layer components {
+  .glass {
+    background: var(--panel);
+    backdrop-filter: blur(22px) saturate(140%);
+    -webkit-backdrop-filter: blur(22px) saturate(140%);
+    border: 1px solid var(--hairline);
+  }
+
+  .glass-strong {
+    background: var(--panel-strong);
+    backdrop-filter: blur(30px) saturate(150%);
+    -webkit-backdrop-filter: blur(30px) saturate(150%);
+    border: 1px solid var(--hairline);
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5
+           text-sm font-semibold transition-all duration-200 select-none;
+  }
+
+  .btn-primary {
+    @apply btn text-white;
+    background: linear-gradient(
+      120deg,
+      rgb(var(--accent-rgb)),
+      rgb(var(--accent2-rgb))
+    );
+    box-shadow: 0 10px 30px -10px rgb(var(--accent-rgb) / 0.8);
+  }
+
+  .btn-primary:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+
+  .btn-ghost {
+    @apply btn glass text-ink;
+  }
+
+  .btn-ghost:hover {
+    background: var(--panel-strong);
+  }
+
+  .field {
+    @apply w-full rounded-2xl px-4 py-3 text-[15px] outline-none transition
+           placeholder:text-muted/70;
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    color: rgb(var(--ink-rgb));
+  }
+
+  .field:focus {
+    border-color: rgb(var(--accent-rgb) / 0.8);
+    box-shadow: 0 0 0 4px rgb(var(--accent-rgb) / 0.16);
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs
+           font-medium transition;
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+  }
+
+  .chip-on {
+    background: rgb(var(--accent-rgb) / 0.2);
+    border-color: rgb(var(--accent-rgb) / 0.55);
+    color: rgb(var(--ink-rgb));
+  }
+
+  .card {
+    @apply glass rounded-3xl transition-all duration-300;
+  }
+
+  .title-xl {
+    @apply font-display font-extrabold tracking-tight;
+    letter-spacing: -0.03em;
+  }
+}
+
+.gradient-text {
+  background: linear-gradient(
+    100deg,
+    rgb(var(--accent-rgb)),
+    rgb(var(--accent2-rgb))
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Scrollbars that match the glass rather than fighting it. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--muted-rgb) / 0.3);
+  border-radius: 99px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--accent-rgb) / 0.55);
+  background-clip: content-box;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 99px;
+  background: rgb(var(--muted-rgb) / 0.3);
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: rgb(var(--accent-rgb));
+  cursor: pointer;
+  box-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.8);
+  transition: transform 0.15s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Safe area for the fixed player on notched phones. */
+.pb-player {
+  padding-bottom: calc(112px + env(safe-area-inset-bottom));
+}

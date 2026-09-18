@@ -1,0 +1,8 @@
+# Optional extra: automatic lyric syncing.
+#
+# Adds roughly 200 MB of wheels, and downloads a ~500 MB Whisper model the
+# first time someone syncs. Skip it and the app still runs -- the endpoint
+# reports itself unavailable and the tap-along sync takes over.
+#
+#   pip install -r backend/requirements-autosync.txt
+faster-whisper==1.2.1

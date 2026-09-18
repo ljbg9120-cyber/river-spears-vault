@@ -1,0 +1,31 @@
+# Deploy config for Fly.io (https://fly.io). Run `fly launch --no-deploy` once to
+# claim an app name, then `fly volumes create vault_data --size 10` and `fly deploy`.
+app = "vault"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  VAULT_DATA_DIR = "/data"
+  VAULT_MAX_UPLOAD_MB = "200"
+  # Set this to your real URL once you know it:
+  #   fly secrets set VAULT_PUBLIC_URL=https://vault.fly.dev
+  #   fly secrets set VAULT_SECRET_KEY=$(python -c "import secrets;print(secrets.token_urlsafe(48))")
+  #   fly secrets set VAULT_GOOGLE_CLIENT_ID=...
+
+[mounts]
+  source = "vault_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[http_service.checks]]
+  path = "/api/health"
+  interval = "30s"
+  timeout = "5s"
