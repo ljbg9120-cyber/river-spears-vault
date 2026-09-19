@@ -72,6 +72,104 @@ export default function Appearance() {
         </p>
       </motion.div>
 
+      {/* ------------------------- playback ------------------------- */}
+      <Section
+        title="Playback"
+        hint="How one track hands over to the next."
+      >
+        <div className="space-y-5">
+          <div>
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <span className="text-sm font-semibold">Crossfade</span>
+              <span className="font-mono text-xs text-muted">
+                {theme.crossfade > 0 ? `${theme.crossfade.toFixed(1)}s` : "off"}
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={12}
+              step={0.5}
+              value={theme.crossfade ?? 0}
+              onChange={(e) => nudge({ crossfade: Number(e.target.value) })}
+              className="w-full"
+              aria-label="Crossfade length"
+            />
+            <p className="mt-1 text-xs text-muted">
+              {theme.crossfade > 0
+                ? "The next track starts before this one ends, and the two are mixed across the overlap. Short sketches fade over a third of their length at most."
+                : "Tracks start the moment the one before them finishes."}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold">Speed</span>
+            <div className="glass inline-flex rounded-xl p-1">
+              {PLAYBACK_SPEEDS.map((rate) => (
+                <button
+                  key={rate}
+                  onClick={() => setSpeed(rate)}
+                  className="rounded-lg px-3 py-1.5 font-mono text-xs font-medium transition"
+                  style={{
+                    background: speed === rate ? "rgb(var(--accent-rgb) / 0.22)" : "transparent",
+                    color: speed === rate ? "rgb(var(--ink-rgb))" : "rgb(var(--muted-rgb))",
+                  }}
+                >
+                  {rate === 1 ? "1x" : `${rate}x`}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      {/* ------------------------- performance ------------------------- */}
+      <Section
+        title="Performance"
+        hint="On an older laptop the blur and glow cost more than everything else here put together."
+      >
+        <div className="space-y-4">
+          <div className="grid gap-2 sm:grid-cols-3">
+            {([
+              ["auto", "Automatic", "Watches the frame rate and eases off if it drops"],
+              ["high", "Full", "Every effect, all the time"],
+              ["low", "Light", "No blur, no glow, fewer particles"],
+            ] as const).map(([value, label, detail]) => {
+              const active = (theme.performance ?? "auto") === value;
+              return (
+                <button
+                  key={value}
+                  onClick={() => commit({ performance: value }, `${label} graphics`)}
+                  className="card p-3 text-left"
+                  style={{
+                    borderColor: active ? "rgb(var(--accent-rgb))" : undefined,
+                    background: active ? "rgb(var(--accent-rgb) / 0.1)" : undefined,
+                  }}
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="font-display text-sm font-bold">{label}</span>
+                    {active && (
+                      <span style={{ color: "rgb(var(--accent-rgb))" }}>
+                        <Icon name="check" size={13} />
+                      </span>
+                    )}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-muted">
+                    {detail}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted">
+            Currently drawing in <strong>{tier === "low" ? "light" : "full"}</strong> mode
+            {(theme.performance ?? "auto") === "auto" && tier === "low"
+              ? " — this machine asked for it, or the frame rate said so."
+              : "."}
+          </p>
+        </div>
+      </Section>
+
       {/* ------------------------- backgrounds ------------------------- */}
       <Section title="Animated background" hint="Two of them move with whatever is playing.">
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
@@ -188,104 +286,6 @@ export default function Appearance() {
         hint="Drop in an MP4 and it plays behind the music, on the lyrics screen and in the player. Sound is stripped — the song is the sound."
       >
         <VideoLibrary theme={theme} onPick={(patch) => commit(patch)} />
-      </Section>
-
-      {/* ------------------------- playback ------------------------- */}
-      <Section
-        title="Playback"
-        hint="How one track hands over to the next."
-      >
-        <div className="space-y-5">
-          <div>
-            <div className="mb-1.5 flex items-baseline justify-between">
-              <span className="text-sm font-semibold">Crossfade</span>
-              <span className="font-mono text-xs text-muted">
-                {theme.crossfade > 0 ? `${theme.crossfade.toFixed(1)}s` : "off"}
-              </span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={12}
-              step={0.5}
-              value={theme.crossfade ?? 0}
-              onChange={(e) => nudge({ crossfade: Number(e.target.value) })}
-              className="w-full"
-              aria-label="Crossfade length"
-            />
-            <p className="mt-1 text-xs text-muted">
-              {theme.crossfade > 0
-                ? "The next track starts before this one ends, and the two are mixed across the overlap. Short sketches fade over a third of their length at most."
-                : "Tracks start the moment the one before them finishes."}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold">Speed</span>
-            <div className="glass inline-flex rounded-xl p-1">
-              {PLAYBACK_SPEEDS.map((rate) => (
-                <button
-                  key={rate}
-                  onClick={() => setSpeed(rate)}
-                  className="rounded-lg px-3 py-1.5 font-mono text-xs font-medium transition"
-                  style={{
-                    background: speed === rate ? "rgb(var(--accent-rgb) / 0.22)" : "transparent",
-                    color: speed === rate ? "rgb(var(--ink-rgb))" : "rgb(var(--muted-rgb))",
-                  }}
-                >
-                  {rate === 1 ? "1x" : `${rate}x`}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </Section>
-
-      {/* ------------------------- performance ------------------------- */}
-      <Section
-        title="Performance"
-        hint="On an older laptop the blur and glow cost more than everything else here put together."
-      >
-        <div className="space-y-4">
-          <div className="grid gap-2 sm:grid-cols-3">
-            {([
-              ["auto", "Automatic", "Watches the frame rate and eases off if it drops"],
-              ["high", "Full", "Every effect, all the time"],
-              ["low", "Light", "No blur, no glow, fewer particles"],
-            ] as const).map(([value, label, detail]) => {
-              const active = (theme.performance ?? "auto") === value;
-              return (
-                <button
-                  key={value}
-                  onClick={() => commit({ performance: value }, `${label} graphics`)}
-                  className="card p-3 text-left"
-                  style={{
-                    borderColor: active ? "rgb(var(--accent-rgb))" : undefined,
-                    background: active ? "rgb(var(--accent-rgb) / 0.1)" : undefined,
-                  }}
-                >
-                  <span className="flex items-center justify-between gap-2">
-                    <span className="font-display text-sm font-bold">{label}</span>
-                    {active && (
-                      <span style={{ color: "rgb(var(--accent-rgb))" }}>
-                        <Icon name="check" size={13} />
-                      </span>
-                    )}
-                  </span>
-                  <span className="mt-0.5 block text-[11px] leading-snug text-muted">
-                    {detail}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-xs text-muted">
-            Currently drawing in <strong>{tier === "low" ? "light" : "full"}</strong> mode
-            {(theme.performance ?? "auto") === "auto" && tier === "low"
-              ? " — this machine asked for it, or the frame rate said so."
-              : "."}
-          </p>
-        </div>
       </Section>
 
       {/* ------------------------- colours ------------------------- */}

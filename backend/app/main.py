@@ -80,7 +80,16 @@ if DIST.exists():
         candidate = DIST / full_path
         if full_path and candidate.is_file():
             return FileResponse(candidate)
-        return FileResponse(DIST / "index.html")
+        # index.html names the hashed bundles, so it must never be cached:
+        # a stale copy pins someone to an old build for as long as their
+        # browser feels like it, and they keep asking where the new thing is.
+        return FileResponse(
+            DIST / "index.html",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+            },
+        )
 else:
 
     @app.get("/")
