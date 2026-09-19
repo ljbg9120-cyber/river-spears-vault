@@ -48,8 +48,22 @@ export default function Background({ theme }: { theme: Theme }) {
   const { analyser, playing } = usePlayer();
   const kind = theme.background;
 
+  // Thinning the panels only gets the glass out of the way; the artwork itself
+  // also has to come up, or "stand out" just means "darker interface".
+  const boost = theme.background_boost ?? 0;
+
   return (
-    <div className={`bg-layer ${theme.grain ? "grain" : ""}`} aria-hidden="true">
+    <div
+      className={`bg-layer ${theme.grain ? "grain" : ""}`}
+      aria-hidden="true"
+      style={
+        boost > 0
+          ? {
+              filter: `saturate(${(1 + boost * 0.8).toFixed(2)}) brightness(${(1 + boost * 0.45).toFixed(2)}) contrast(${(1 + boost * 0.2).toFixed(2)})`,
+            }
+          : undefined
+      }
+    >
       <BaseWash theme={theme} />
       {kind === "aurora" && <Aurora theme={theme} />}
       {kind === "mesh" && <Mesh theme={theme} />}
