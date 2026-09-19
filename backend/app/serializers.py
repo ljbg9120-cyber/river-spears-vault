@@ -35,34 +35,45 @@ def folder_out(folder: Folder, track_count: int = 0) -> FolderOut:
 def track_out(
     db: Session, track: Track, viewer: User | None = None, share_token: str | None = None
 ) -> TrackOut:
-    comment_count = (
-        db.query(func.count(Comment.id)).filter(Comment.track_id == track.id).scalar()
-        or 0
-    )
-    like_count = (
-        db.query(func.count(Like.id)).filter(Like.track_id == track.id).scalar() or 0
-    )
-    liked = False
+    return tracks_out(db, [track], viewer, share_token)[0]
+
+
+def tracks_out(
+    db: Session, tracks: list[Track], viewer: User | None = None,
+    share_token: str | None = None,
+) -> list[TrackOut]:
+    """Aggregate activity once per page, not three queries for every track."""
+    if not tracks:
+        return []
+    ids = [track.id for track in tracks]
+    comment_counts = {
+        tid: (total, unresolved) for tid, total, unresolved in db.query(
+            Comment.track_id, func.count(Comment.id),
+            func.count(Comment.id).filter(Comment.resolved.is_(False)),
+        ).filter(Comment.track_id.in_(ids)).group_by(Comment.track_id).all()
+    }
+    like_counts = dict(db.query(Like.track_id, func.count(Like.id)).filter(
+        Like.track_id.in_(ids),
+    ).group_by(Like.track_id).all())
+    liked_ids: set[str] = set()
     if viewer is not None:
-        liked = (
-            db.query(Like.id)
-            .filter(Like.track_id == track.id, Like.user_id == viewer.id)
-            .first()
-            is not None
-        )
-
-    stream = f"/api/tracks/{track.id}/stream"
-    if share_token:
-        stream = f"{stream}?t={share_token}"
-
-    data = TrackOut.model_validate(track, from_attributes=True)
-    data.owner = PublicUser.model_validate(track.owner, from_attributes=True)
-    data.comment_count = comment_count
-    data.like_count = like_count
-    data.liked_by_me = liked
-    data.stream_url = stream
-    data.cover_url = cover_url(track.folder, share_token)
-    return data
+        liked_ids = {tid for (tid,) in db.query(Like.track_id).filter(
+            Like.track_id.in_(ids), Like.user_id == viewer.id,
+        ).all()}
+    result = []
+    for track in tracks:
+        stream = f"/api/tracks/{track.id}/stream"
+        if share_token:
+            stream = f"{stream}?t={share_token}"
+        data = TrackOut.model_validate(track, from_attributes=True)
+        data.owner = PublicUser.model_validate(track.owner, from_attributes=True)
+        data.comment_count, data.unresolved_comment_count = comment_counts.get(track.id, (0, 0))
+        data.like_count = like_counts.get(track.id, 0)
+        data.liked_by_me = track.id in liked_ids
+        data.stream_url = stream
+        data.cover_url = cover_url(track.folder, share_token)
+        result.append(data)
+    return result
 
 
 def comment_out(comment: Comment, track_owner_id: str) -> CommentOut:
@@ -76,4 +87,6 @@ def comment_out(comment: Comment, track_owner_id: str) -> CommentOut:
         author_handle=author.handle if author else None,
         author_avatar=author.avatar_url if author else None,
         is_owner=bool(author and author.id == track_owner_id),
+        resolved=comment.resolved,
+        resolved_at=comment.resolved_at,
     )

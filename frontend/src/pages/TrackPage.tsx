@@ -1,383 +1,233 @@
-/** One track, full size: big waveform, timestamped feedback, share controls. */
+/** A focused review room: audio, version history and actionable feedback. */
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import AutoSync from "../components/AutoSync";
 import Cover from "../components/Cover";
 import LyricsSync from "../components/LyricsSync";
+import VersionHistory from "../components/VersionHistory";
 import Waveform from "../components/Waveform";
 import { Avatar, Empty, Icon, Modal, Spinner, useToast } from "../components/ui";
-import {
-  api,
-  formatDate,
-  formatSize,
-  formatTime,
-  type Comment,
-  type ShareLink,
-  type Track,
-} from "../lib/api";
+import { api, formatDate, formatSize, formatTime, TRACK_STATUSES, type Comment, type ShareLink, type Track, type TrackStatus } from "../lib/api";
 import { parseLyrics, hasTimings } from "../lib/lyrics";
 import { useAuth, usePlayer } from "../lib/store";
+import "./review.css";
+
+type FeedbackFilter = "open" | "all" | "resolved";
 
 export default function TrackPage() {
   const { id } = useParams<{ id: string }>();
   const [params] = useSearchParams();
   const token = params.get("t") ?? undefined;
+  const at = params.get("at");
+  const focusedComment = params.get("comment");
   const { user } = useAuth();
-  const { current, playing, play, time, duration, seek } = usePlayer();
+  const { current, playing, play, playAt, time, duration, seek, addToQueue } = usePlayer();
   const toast = useToast();
   const nav = useNavigate();
-
   const [track, setTrack] = useState<Track | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [reload, setReload] = useState(0);
   const [body, setBody] = useState("");
   const [guestName, setGuestName] = useState("");
   const [pinTime, setPinTime] = useState(true);
+  const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState("");
   const [editing, setEditing] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-
-  const suffix = token ? `?t=${token}` : "";
+  const [filter, setFilter] = useState<FeedbackFilter>("open");
+  const [saving, setSaving] = useState(false);
+  const [busyComments, setBusyComments] = useState<Set<string>>(new Set());
+  const openedAt = useRef("");
+  const suffix = token ? `?t=${encodeURIComponent(token)}` : "";
   const isCurrent = current?.id === track?.id;
   const total = isCurrent ? duration || track?.duration || 0 : track?.duration ?? 0;
   const progress = isCurrent && total > 0 ? Math.min(1, time / total) : 0;
   const isOwner = !!user && !!track && user.id === track.owner.id;
-
-  const load = useCallback(async () => {
-    if (!id) return;
-    const [t, c] = await Promise.all([
-      api.get<Track>(`/api/tracks/${id}${suffix}`),
-      api.get<Comment[]>(`/api/tracks/${id}/comments${suffix}`),
-    ]);
-    setTrack(t);
-    setComments(c);
-  }, [id, suffix]);
+  const openCount = comments.filter((c) => !c.resolved).length;
+  const shownComments = comments.filter((c) => filter === "all" || (filter === "resolved" ? c.resolved : !c.resolved));
 
   useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
     setLoading(true);
-    load()
-      .catch(() => toast("Could not load that track", "err"))
-      .finally(() => setLoading(false));
-  }, [load, toast]);
+    setLoadError("");
+    setTrack(null);
+    setComments([]);
+    setBody("");
+    setPostError("");
+    setFilter(focusedComment ? "all" : "open");
+    Promise.all([
+      api.get<Track>(`/api/tracks/${id}${suffix}`),
+      api.get<Comment[]>(`/api/tracks/${id}/comments${suffix}`),
+    ]).then(([nextTrack, nextComments]) => {
+      if (!cancelled) { setTrack(nextTrack); setComments(nextComments); }
+    }).catch((err) => {
+      if (!cancelled) setLoadError(err instanceof Error ? err.message : "Could not load this track.");
+    }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [id, suffix, reload, focusedComment]);
 
-  const postComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!body.trim() || !track) return;
+  useEffect(() => {
+    if (!track || at === null) return;
+    const target = Number(at);
+    const key = `${track.id}:${at}`;
+    if (!Number.isFinite(target) || target < 0 || openedAt.current === key) return;
+    openedAt.current = key;
+    playAt(track, target, [track], token);
+  }, [track, at, playAt, token]);
+
+  useEffect(() => {
+    if (!loading && focusedComment) document.getElementById(`feedback-${focusedComment}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [loading, focusedComment]);
+
+  const postComment = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!body.trim() || !track || posting) return;
+    setPosting(true);
+    setPostError("");
     try {
-      const c = await api.post<Comment>(`/api/tracks/${track.id}/comments${suffix}`, {
-        body: body.trim(),
-        at_sec: pinTime && isCurrent ? time : null,
+      const comment = await api.post<Comment>(`/api/tracks/${track.id}/comments${suffix}`, {
+        body: body.trim(), at_sec: pinTime && isCurrent ? time : null,
         guest_name: user ? undefined : guestName.trim(),
       });
-      setComments((cs) => [...cs, c]);
+      setComments((items) => [...items, comment]);
       setBody("");
+      setFilter("open");
       toast("Feedback added");
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Could not post that", "err");
-    }
+    } catch (err) { setPostError(err instanceof Error ? err.message : "Could not post feedback. Your note is still here."); }
+    finally { setPosting(false); }
   };
 
-  const removeComment = async (c: Comment) => {
-    if (!track) return;
-    await api.del(`/api/tracks/${track.id}/comments/${c.id}`);
-    setComments((cs) => cs.filter((x) => x.id !== c.id));
+  const mutateComment = async (comment: Comment, remove = false) => {
+    if (!track || busyComments.has(comment.id)) return;
+    setBusyComments((items) => new Set(items).add(comment.id));
+    try {
+      if (remove) {
+        if (!confirm("Delete this feedback permanently?")) return;
+        await api.del(`/api/tracks/${track.id}/comments/${comment.id}`);
+        setComments((items) => items.filter((item) => item.id !== comment.id));
+        toast("Feedback deleted");
+      } else {
+        const updated = await api.patch<Comment>(`/api/comments/${comment.id}`, { resolved: !comment.resolved });
+        setComments((items) => items.map((item) => item.id === updated.id ? updated : item));
+        toast(updated.resolved ? "Feedback resolved" : "Feedback reopened");
+      }
+    } catch (err) { toast(err instanceof Error ? err.message : "Could not update feedback", "err"); }
+    finally { setBusyComments((items) => { const next = new Set(items); next.delete(comment.id); return next; }); }
+  };
+
+  const updateTrack = async (patch: Partial<Track>) => {
+    if (!track || saving) return;
+    setSaving(true);
+    try { setTrack(await api.patch<Track>(`/api/tracks/${track.id}`, patch)); }
+    catch (err) { toast(err instanceof Error ? err.message : "Could not save that change", "err"); }
+    finally { setSaving(false); }
   };
 
   const toggleLike = async () => {
-    if (!track) return;
-    const res = await api.post<{ liked: boolean; like_count: number }>(
-      `/api/tracks/${track.id}/like${suffix}`,
-    );
-    setTrack({ ...track, liked_by_me: res.liked, like_count: res.like_count });
+    if (!track || saving) return;
+    setSaving(true);
+    try {
+      const result = await api.post<{ liked: boolean; like_count: number }>(`/api/tracks/${track.id}/like${suffix}`);
+      setTrack((previous) => previous ? { ...previous, liked_by_me: result.liked, like_count: result.like_count } : previous);
+    } catch (err) { toast(err instanceof Error ? err.message : "Could not update like", "err"); }
+    finally { setSaving(false); }
   };
 
   const removeTrack = async () => {
-    if (!track || !confirm(`Delete "${track.title}" permanently?`)) return;
-    await api.del(`/api/tracks/${track.id}`);
-    toast("Track deleted");
-    nav("/library");
+    if (!track || !confirm(`Delete "${track.title}" version ${track.version_number || 1} permanently? Its feedback and share links will also be removed.`)) return;
+    try { await api.del(`/api/tracks/${track.id}`); toast("Track deleted"); nav("/library"); }
+    catch (err) { toast(err instanceof Error ? err.message : "Could not delete track", "err"); }
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-32 text-muted">
-        <Spinner size={28} />
-      </div>
-    );
-  }
+  if (loading) return <div className="review-loading" role="status" aria-label="Loading track"><Spinner size={28} /></div>;
+  if (loadError) return <Empty icon="music" title="This track could not be loaded" hint={loadError} action={<button className="btn-primary" onClick={() => setReload((n) => n + 1)}>Try again</button>} />;
+  if (!track) return <Empty title="Track not found" hint="It may have been deleted or the link revoked." />;
+  const lines = parseLyrics(track.lyrics);
 
-  if (!track) {
-    return <Empty title="Track not found" hint="It may have been deleted or the link revoked." />;
-  }
-
-  return (
-    <div className="mx-auto max-w-3xl">
-      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} className="card p-5 sm:p-7">
-        <div className="flex items-start gap-4">
-          <motion.button
-            whileTap={{ scale: 0.92 }}
-            onClick={() => play(track, [track], token)}
-            className="group relative h-16 w-16 shrink-0 sm:h-20 sm:w-20"
-            style={{ boxShadow: "0 14px 40px -14px rgb(var(--accent-rgb))" }}
-            aria-label={isCurrent && playing ? "Pause" : "Play"}
-          >
-            <Cover url={track.cover_url || undefined} radius={16} icon={28} />
-            <span className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/35 text-white transition group-hover:bg-black/50">
-              <Icon name={isCurrent && playing ? "pause" : "play"} size={28} />
-            </span>
-          </motion.button>
-
-          <div className="min-w-0 flex-1">
-            <h1 className="title-xl truncate text-2xl sm:text-3xl">{track.title}</h1>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted">
-              <span className="flex items-center gap-1.5">
-                <Avatar name={track.owner.display_name} src={track.owner.avatar_url} size={20} />
-                {track.owner.display_name}
-              </span>
-              <span className="font-mono">{formatTime(track.duration)}</span>
-              {track.bpm && <span className="font-mono">{track.bpm} BPM</span>}
-              {track.song_key && <span className="font-mono">{track.song_key}</span>}
-              <span>{formatDate(track.created_at)}</span>
-              <span>{formatSize(track.size_bytes)}</span>
-              {track.plays > 0 && <span>{track.plays} plays</span>}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <Waveform
-            peaks={track.peaks}
-            progress={progress}
-            height={110}
-            duration={total}
-            comments={comments}
-            live={isCurrent && playing}
-            onSeek={(r) => {
-              if (!isCurrent) play(track, [track], token);
-              seek(r * total);
-            }}
-            onCommentClick={(c) => {
-              if (!isCurrent) play(track, [track], token);
-              if (c.at_sec !== null) seek(c.at_sec);
-            }}
-          />
-        </div>
-
-        {track.tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {track.tags.map((t) => (
-              <span key={t} className="chip">
-                <Icon name="tag" size={11} />
-                {t}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {track.notes && (
-          <p className="mt-4 whitespace-pre-wrap rounded-2xl bg-white/5 p-4 text-sm leading-relaxed text-muted">
-            {track.notes}
-          </p>
-        )}
-
-        {(() => {
-          const lines = parseLyrics(track.lyrics);
-          if (lines.length === 0) return null;
-          return (
-            <div className="mt-4 rounded-2xl bg-white/5 p-4">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <h2 className="font-display text-sm font-bold uppercase tracking-wider text-muted">
-                  Lyrics
-                </h2>
-                <button
-                  onClick={() => {
-                    if (!isCurrent) play(track, [track], token);
-                    window.dispatchEvent(new CustomEvent("vault:nowplaying"));
-                  }}
-                  className="chip chip-on"
-                >
-                  <Icon name="sparkles" size={12} />
-                  {hasTimings(lines) ? "Follow along" : "Full screen"}
-                </button>
-              </div>
-              <div className="max-h-56 overflow-y-auto text-sm leading-relaxed text-muted">
-                {lines.map((l, i) => (
-                  <div key={i}>{l.text || " "}</div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          {user && (
-            <button onClick={toggleLike} className="btn-ghost !px-4 !py-2 text-sm">
-              <span style={{ color: track.liked_by_me ? "rgb(var(--accent-rgb))" : undefined }}>
-                <Icon name="heart" size={15} filled={track.liked_by_me} />
-              </span>
-              {track.like_count > 0 ? track.like_count : "Like"}
-            </button>
-          )}
-          {isOwner && (
-            <>
-              <button onClick={() => setShareOpen(true)} className="btn-primary !px-4 !py-2 text-sm">
-                <Icon name="share" size={15} /> Share
-              </button>
-              <button onClick={() => setEditing(true)} className="btn-ghost !px-4 !py-2 text-sm">
-                <Icon name="edit" size={15} /> Edit
-              </button>
-              <button
-                onClick={removeTrack}
-                className="btn-ghost !px-4 !py-2 text-sm"
-                style={{ color: "#ff8098" }}
-              >
-                <Icon name="trash" size={15} />
-              </button>
-            </>
-          )}
-          {(track.allow_download || isOwner) && (
-            <a
-              href={`/api/tracks/${track.id}/download${suffix}`}
-              className="btn-ghost !px-4 !py-2 text-sm"
-            >
-              <Icon name="download" size={15} /> Download
-            </a>
-          )}
-        </div>
-      </motion.div>
-
-      {/* --------------------------- comments --------------------------- */}
-      <motion.div
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.08 }}
-        className="card mt-4 p-5 sm:p-6"
-      >
-        <h2 className="mb-4 font-display text-lg font-bold">
-          Feedback {comments.length > 0 && <span className="text-muted">({comments.length})</span>}
-        </h2>
-
-        <form onSubmit={postComment} className="mb-5 space-y-2">
-          {!user && (
-            <input
-              className="field"
-              placeholder="Your name"
-              value={guestName}
-              onChange={(e) => setGuestName(e.target.value)}
-              required
-              maxLength={60}
-            />
-          )}
-          <textarea
-            className="field min-h-[80px] resize-y"
-            placeholder={
-              isCurrent
-                ? `Say something about ${formatTime(time)}…`
-                : "Play the track to pin a note to the exact second…"
-            }
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            maxLength={2000}
-          />
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setPinTime((v) => !v)}
-              disabled={!isCurrent}
-              className={`chip ${pinTime && isCurrent ? "chip-on" : ""} disabled:opacity-40`}
-            >
-              <Icon name="clock" size={12} />
-              {isCurrent ? `Pin to ${formatTime(time)}` : "Pin to time"}
-            </button>
-            <button type="submit" disabled={!body.trim()} className="btn-primary !px-5 !py-2 text-sm disabled:opacity-50">
-              Post
-            </button>
-          </div>
-        </form>
-
-        {comments.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted">
-            No feedback yet. Share a link and the notes land here.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            <AnimatePresence initial={false}>
-              {comments.map((c) => (
-                <motion.div
-                  key={c.id}
-                  layout
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -12 }}
-                  className="group flex gap-3 rounded-2xl p-3 transition hover:bg-white/5"
-                >
-                  <Avatar name={c.author_name} src={c.author_avatar} size={32} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold">{c.author_name}</span>
-                      {c.is_owner && (
-                        <span
-                          className="rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase"
-                          style={{
-                            background: "rgb(var(--accent-rgb) / 0.2)",
-                            color: "rgb(var(--accent-rgb))",
-                          }}
-                        >
-                          artist
-                        </span>
-                      )}
-                      {c.at_sec !== null && (
-                        <button
-                          onClick={() => {
-                            if (!isCurrent) play(track, [track], token);
-                            seek(c.at_sec!);
-                          }}
-                          className="font-mono text-xs transition hover:underline"
-                          style={{ color: "rgb(var(--accent2-rgb))" }}
-                        >
-                          {formatTime(c.at_sec)}
-                        </button>
-                      )}
-                      <span className="text-xs text-muted">{formatDate(c.created_at)}</span>
-                    </div>
-                    <p className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed">
-                      {c.body}
-                    </p>
-                  </div>
-                  {(isOwner || (user && c.author_handle === user.handle)) && (
-                    <button
-                      onClick={() => removeComment(c)}
-                      className="self-start rounded-lg p-1.5 text-muted opacity-0 transition hover:text-ink group-hover:opacity-100"
-                      aria-label="Delete comment"
-                    >
-                      <Icon name="trash" size={14} />
-                    </button>
-                  )}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        )}
-      </motion.div>
-
-      {isOwner && (
-        <>
-          <EditModal
-            open={editing}
-            onClose={() => setEditing(false)}
-            track={track}
-            onSaved={(t) => {
-              setTrack(t);
-              toast("Saved");
-            }}
-          />
-          <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} track={track} />
-        </>
-      )}
+  return <div className="review-page">
+    <div className="review-breadcrumb">
+      {isOwner ? <><Link to="/library">Library</Link><Icon name="chevron" size={12} /><span>Track workspace</span></> : <><Icon name="music" size={14} /><span>{track.owner.display_name} · Listening room</span></>}
+      <span className="review-privacy"><Icon name={track.visibility === "public" ? "globe" : "lock"} size={12} />{track.visibility === "unlisted" ? "Link only" : track.visibility}</span>
     </div>
-  );
-}
+    <div className={`review-layout ${isOwner ? "" : "review-layout-public"}`}>
+      <div className="review-main">
+        <motion.section initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="review-panel review-track-panel">
+          <div className="review-track-heading">
+            <button onClick={() => play(track, [track], token)} className="review-cover-button" aria-label={`${isCurrent && playing ? "Pause" : "Play"} ${track.title}`}>
+              <Cover url={track.cover_url || undefined} radius={12} icon={28} />
+              <span><Icon name={isCurrent && playing ? "pause" : "play"} size={28} /></span>
+            </button>
+            <div className="review-track-title">
+              <p className="review-eyebrow">VERSION {track.version_number || 1}{track.revision_note ? ` / ${track.revision_note}` : " / ORIGINAL UPLOAD"}</p>
+              <h1>{track.title}</h1>
+              <div className="review-owner"><Avatar name={track.owner.display_name} src={track.owner.avatar_url} size={22} /><span>{track.owner.display_name}</span></div>
+            </div>
+            {isOwner && <button className={`review-icon-button review-favorite ${track.is_favorite ? "is-active" : ""}`} onClick={() => updateTrack({ is_favorite: !track.is_favorite })} disabled={saving} aria-label={track.is_favorite ? "Remove from favorites" : "Add to favorites"} aria-pressed={track.is_favorite}><Icon name="heart" size={21} filled={track.is_favorite} /></button>}
+          </div>
+          <div className="review-metadata">
+            <span><Icon name="clock" size={13} />{formatTime(track.duration)}</span>
+            {track.bpm && <span>{track.bpm} BPM</span>}
+            {track.song_key && <span>{track.song_key}</span>}
+            <span>{formatSize(track.size_bytes)}</span><span>Added {formatDate(track.created_at)}</span>
+            {track.plays > 0 && <span>{track.plays} plays</span>}
+          </div>
+          <div className="review-waveform">
+            <Waveform peaks={track.peaks} progress={progress} height={112} duration={total} comments={comments.filter((comment) => !comment.resolved)} live={isCurrent && playing}
+              onSeek={(ratio) => { if (isCurrent) seek(ratio * total); else playAt(track, ratio * total, [track], token); }}
+              onCommentClick={(comment) => playAt(track, comment.at_sec ?? 0, [track], token)} />
+            <div className="review-waveform-caption"><span>{isCurrent ? formatTime(time) : "0:00"}</span><span>{openCount} open {openCount === 1 ? "note" : "notes"} on this version</span><span>{formatTime(total)}</span></div>
+          </div>
+          <div className="review-track-actions">
+            <button className="btn-primary" onClick={() => play(track, [track], token)}><Icon name={isCurrent && playing ? "pause" : "play"} size={16} />{isCurrent && playing ? "Pause" : "Play track"}</button>
+            {isOwner && <button className="btn-ghost" onClick={() => setShareOpen(true)}><Icon name="share" size={16} />Share</button>}
+            <button className="btn-ghost" onClick={() => { addToQueue(track, token); toast("Added to queue"); }}><Icon name="plus" size={16} />Queue</button>
+            {(track.allow_download || isOwner) && <a href={`/api/tracks/${track.id}/download${suffix}`} className="btn-ghost" aria-label="Download this version"><Icon name="download" size={16} /><span className="review-download-label">Download</span></a>}
+            {!isOwner && user && <button onClick={toggleLike} disabled={saving} className="btn-ghost" aria-label="Like this track"><Icon name="heart" size={16} filled={track.liked_by_me} />{track.like_count || "Like"}</button>}
+          </div>
+          {isOwner && <div className="review-workflow">
+            <label htmlFor="track-status">Production status</label>
+            <select id="track-status" className={`field review-status-select status-${track.status}`} value={track.status || "demo"} onChange={(event) => updateTrack({ status: event.target.value as TrackStatus })} disabled={saving}>{TRACK_STATUSES.map((status) => <option value={status.value} key={status.value}>{status.label}</option>)}</select>
+            <button className="review-text-button" onClick={() => setEditing(true)}><Icon name="edit" size={14} />Edit details</button>
+          </div>}
+          {track.tags.length > 0 && <div className="review-tags">{track.tags.map((tag) => <span key={tag} className="chip">{tag}</span>)}</div>}
+          {track.notes && <div className="review-notes"><h3>Session notes</h3><p>{track.notes}</p></div>}
+          {lines.length > 0 && <details className="review-lyrics">
+            <summary>Lyrics <span>{hasTimings(lines) ? "Synced" : `${lines.length} lines`}</span></summary>
+            <button onClick={() => { if (!isCurrent) play(track, [track], token); window.dispatchEvent(new CustomEvent("vault:nowplaying")); }} className="review-inline-link"><Icon name="sparkles" size={14} />{hasTimings(lines) ? "Follow along in the player" : "Open full screen"}</button>
+            <div className="review-lyrics-body">{lines.map((line, index) => <div key={index}>{line.text || " "}</div>)}</div>
+          </details>}
+        </motion.section>
 
+        <section className="review-panel review-feedback-panel" aria-label="Track feedback">
+          <div className="review-section-top"><div><p className="review-eyebrow">MAKE THE NEXT MIX BETTER</p><h2>Feedback <span className="review-count">{comments.length}</span></h2></div>{openCount === 0 && comments.length > 0 && <span className="review-all-resolved"><Icon name="check" size={14} />All resolved</span>}</div>
+          <form onSubmit={postComment} className="review-comment-form">
+            {!user && <input className="field" aria-label="Your name" placeholder="Your name" value={guestName} onChange={(event) => setGuestName(event.target.value)} required maxLength={60} />}
+            <label className="sr-only" htmlFor="feedback-body">Feedback on version {track.version_number || 1}</label>
+            <textarea id="feedback-body" className="field" placeholder={isCurrent ? `What do you hear at ${formatTime(time)}?` : "Leave a note. Play the track to pin it to an exact moment."} value={body} onChange={(event) => setBody(event.target.value)} maxLength={2000} rows={3} disabled={posting} />
+            <div className="review-form-footer"><button type="button" onClick={() => setPinTime((value) => !value)} disabled={!isCurrent || posting} className={`review-pin ${pinTime && isCurrent ? "is-active" : ""}`} aria-pressed={pinTime && isCurrent}><Icon name="clock" size={14} />{isCurrent && pinTime ? `Pinned at ${formatTime(time)}` : "Pin to timestamp"}</button><button type="submit" disabled={!body.trim() || posting} className="btn-primary">{posting ? <Spinner size={16} /> : <Icon name="plus" size={15} />}Add feedback</button></div>
+            {postError && <p className="review-error" role="alert">{postError}</p>}
+          </form>
+          <div className="review-filter-bar" role="group" aria-label="Filter feedback">{(["open", "all", "resolved"] as const).map((value) => <button key={value} onClick={() => setFilter(value)} className={filter === value ? "is-active" : ""} aria-pressed={filter === value}>{value === "open" ? "Open" : value === "all" ? "All feedback" : "Resolved"}<span>{value === "open" ? openCount : value === "all" ? comments.length : comments.length - openCount}</span></button>)}</div>
+          {shownComments.length === 0 ? <div className="review-feedback-empty"><Icon name={filter === "open" && comments.length > 0 ? "check" : "comment"} size={25} /><h3>{comments.length === 0 ? "Good feedback starts with a listen." : filter === "open" ? "Every note is taken care of." : "No resolved notes yet."}</h3><p>{comments.length === 0 ? "Share this version and bring the conversation to the exact second." : filter === "open" ? "You’re ready for the next version. All previous notes are still in All feedback." : "Resolve feedback as you work through it."}</p></div> : <div className="review-comments"><AnimatePresence initial={false}>{shownComments.map((comment) => <motion.article key={comment.id} id={`feedback-${comment.id}`} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={`review-comment ${comment.resolved ? "is-resolved" : ""} ${focusedComment === comment.id ? "is-highlighted" : ""}`}>
+            <Avatar name={comment.author_name} src={comment.author_avatar} size={32} />
+            <div className="review-comment-content"><div className="review-comment-meta"><strong>{comment.author_name}</strong>{comment.is_owner && <span className="review-artist-badge">Artist</span>}<span>{formatDate(comment.created_at)}</span>{comment.resolved && <span className="review-resolved-badge"><Icon name="check" size={12} />Resolved</span>}</div><p>{comment.body}</p><div className="review-comment-bottom">
+              {comment.at_sec !== null ? <button className="review-timestamp" onClick={() => playAt(track, comment.at_sec!, [track], token)}><Icon name="play" size={11} />{formatTime(comment.at_sec)}</button> : <span className="review-general-note">General note</span>}
+              {isOwner && <button className="review-resolve" disabled={busyComments.has(comment.id)} onClick={() => mutateComment(comment)}>{busyComments.has(comment.id) ? <Spinner size={13} /> : <Icon name={comment.resolved ? "plus" : "check"} size={14} />}{comment.resolved ? "Reopen" : "Resolve"}</button>}
+              {(isOwner || (user && comment.author_handle === user.handle)) && <button className="review-icon-button review-delete-comment" onClick={() => mutateComment(comment, true)} disabled={busyComments.has(comment.id)} aria-label={`Delete feedback from ${comment.author_name}`}><Icon name="trash" size={14} /></button>}
+            </div></div>
+          </motion.article>)}</AnimatePresence></div>}
+        </section>
+        {isOwner && <div className="review-track-footer"><span>Changes saved to your private vault.</span><button className="review-text-button review-danger" onClick={removeTrack}><Icon name="trash" size={13} />Delete this version</button></div>}
+      </div>
+      {isOwner && <VersionHistory track={{ ...track, unresolved_comment_count: openCount }} />}
+    </div>
+    {isOwner && <><EditModal key={track.id} open={editing} onClose={() => setEditing(false)} track={track} onSaved={(updated) => { setTrack(updated); toast("Track details saved"); }} /><ShareModal key={`share-${track.id}`} open={shareOpen} onClose={() => setShareOpen(false)} track={track} /></>}
+  </div>;
+}
 function EditModal({
   open,
   onClose,
@@ -631,3 +481,4 @@ function Labelled({ label, children }: { label: string; children: React.ReactNod
     </label>
   );
 }
+

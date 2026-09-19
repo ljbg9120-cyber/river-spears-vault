@@ -204,7 +204,7 @@ export type IconName =
   | "search" | "x" | "plus" | "trash" | "share" | "heart" | "comment"
   | "download" | "settings" | "sparkles" | "lock" | "globe" | "link"
   | "check" | "chevron" | "volume" | "grid" | "list" | "logout" | "user"
-  | "shuffle" | "tag" | "clock" | "edit";
+  | "shuffle" | "tag" | "clock" | "edit" | "repeat";
 
 const PATHS: Record<IconName, string> = {
   play: "M8 5v14l11-7z",
@@ -235,6 +235,7 @@ const PATHS: Record<IconName, string> = {
   logout: "M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9",
   user: "M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z",
   shuffle: "M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5",
+  repeat: "M17 2l4 4-4 4M3 11v-1a4 4 0 014-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 01-4 4H3",
   tag: "M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0l-7.2-7.2a2 2 0 01-.6-1.4V4a2 2 0 012-2h8c.5 0 1 .2 1.4.6l6.4 6.4a2 2 0 010 2.8zM7.5 7.5h.01",
   clock: "M12 21a9 9 0 100-18 9 9 0 000 18zm0-14v5l3 2",
   edit: "M11 4H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-5M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4 9.5-9.5z",

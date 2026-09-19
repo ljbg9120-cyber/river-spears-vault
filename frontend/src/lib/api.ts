@@ -74,6 +74,10 @@ export type Theme = {
   video_id: string | null;
   video_fit: "cover" | "contain";
   video_dim: number;
+  /** Seconds of overlap between tracks; 0 is off. */
+  crossfade: number;
+  skip_silence: boolean;
+  performance: "auto" | "high" | "low";
 };
 
 export type User = {
@@ -88,6 +92,15 @@ export type User = {
 };
 
 export type PublicUser = Omit<User, "email" | "created_at">;
+
+export type TrackStatus = "demo" | "in_progress" | "in_review" | "approved";
+
+export const TRACK_STATUSES: { value: TrackStatus; label: string }[] = [
+  { value: "demo", label: "Demo" },
+  { value: "in_progress", label: "In progress" },
+  { value: "in_review", label: "In review" },
+  { value: "approved", label: "Approved" },
+];
 
 export type Track = {
   id: string;
@@ -111,6 +124,12 @@ export type Track = {
   comment_count: number;
   like_count: number;
   liked_by_me: boolean;
+  status: TrackStatus;
+  is_favorite: boolean;
+  unresolved_comment_count: number;
+  version_root_id: string | null;
+  version_number: number;
+  revision_note: string;
   stream_url: string;
   /** Inherited from the track's album, empty when there is none. */
   cover_url: string;
@@ -137,6 +156,16 @@ export type Comment = {
   author_handle: string | null;
   author_avatar: string | null;
   is_owner: boolean;
+  resolved: boolean;
+  resolved_at: string | null;
+};
+
+export type FeedbackItem = Comment & {
+  track_id: string;
+  track_title: string;
+  track_cover_url: string;
+  version_number: number;
+  track_status: TrackStatus;
 };
 
 export type ShareLink = {

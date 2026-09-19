@@ -222,3 +222,55 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .pb-player {
   padding-bottom: calc(112px + env(safe-area-inset-bottom));
 }
+`n
+
+/* ---------------------------------------------------------------------------
+   Low-performance path.
+   Same layout, same colours, drawn cheaply. Backdrop blur is the expensive
+   part of this interface: every glass panel forces the compositor to sample
+   and blur what is behind it, on every frame, and on integrated graphics that
+   alone can halve the frame rate. Below it is replaced with a flat translucent
+   fill that reads almost identically.
+--------------------------------------------------------------------------- */
+:root[data-perf="low"] {
+  --panel: rgba(28, 26, 44, 0.86);
+  --panel-strong: rgba(32, 30, 50, 0.94);
+}
+
+:root[data-perf="low"][data-mode="light"] {
+  --panel: rgba(255, 255, 255, 0.92);
+  --panel-strong: rgba(255, 255, 255, 0.97);
+}
+
+:root[data-perf="low"] .glass,
+:root[data-perf="low"] .glass-strong {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* The grain layer repaints a full-screen noise texture three times a second. */
+:root[data-perf="low"] .grain::after {
+  display: none;
+}
+
+/* Large blurred shadows are re-rasterised whenever the element moves. */
+:root[data-perf="low"] .shadow-lift,
+:root[data-perf="low"] .shadow-glow {
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.6);
+}
+
+/* Keep feedback on interaction, drop decorative easing. */
+:root[data-perf="low"] * {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 120ms !important;
+}
+
+/* Transforms and opacity stay: they are compositor-only and effectively free,
+   and without them buttons feel dead. */
+:root[data-perf="low"] .btn,
+:root[data-perf="low"] .btn-primary,
+:root[data-perf="low"] .btn-ghost,
+:root[data-perf="low"] .chip {
+  transition-property: transform, opacity, background-color, color !important;
+}

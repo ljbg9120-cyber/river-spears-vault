@@ -1,197 +1,80 @@
-/** App chrome: the logo, the nav, the account menu. */
-import { AnimatePresence, motion } from "framer-motion";
+/** Persistent workspace navigation and the public-site header. */
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BRAND } from "../lib/brand";
 import { useAuth } from "../lib/store";
-import { Avatar, Icon } from "./ui";
+import { Avatar, Icon, Modal, useToast } from "./ui";
 
-export function Logo({ size = 30 }: { size?: number }) {
-  return (
-    <span className="flex items-center gap-2.5">
-      <motion.span
-        whileHover={{ rotate: -8, scale: 1.06 }}
-        transition={{ type: "spring", stiffness: 400, damping: 14 }}
-        className="flex items-center justify-center rounded-xl text-white"
-        style={{
-          width: size,
-          height: size,
-          background:
-            "linear-gradient(135deg, rgb(var(--accent-rgb)), rgb(var(--accent2-rgb)))",
-          boxShadow: "0 6px 18px -6px rgb(var(--accent-rgb))",
-        }}
-      >
-        <svg width={size * 0.56} height={size * 0.56} viewBox="0 0 24 24" fill="none">
-          <path
-            d="M4 6h16M4 12h16M4 18h16"
-            stroke="currentColor"
-            strokeWidth="2.6"
-            strokeLinecap="round"
-            opacity="0.35"
-          />
-          <path
-            d="M8 4v16M16 4v16"
-            stroke="currentColor"
-            strokeWidth="2.6"
-            strokeLinecap="round"
-          />
-        </svg>
-      </motion.span>
-      <span className="flex flex-col leading-none">
-        <span className="title-xl text-[17px] leading-none sm:text-[19px]">
-          {BRAND.primary}
-        </span>
-        <span className="mt-0.5 hidden text-[9.5px] font-medium uppercase tracking-[0.13em] text-muted sm:block">
-          {BRAND.secondary}
-        </span>
-      </span>
-    </span>
-  );
+export function Logo({ size = 36 }: { size?: number }) {
+  return <span className="vault-wordmark">
+    <span className="vault-mark" style={{ width: size, height: size }}><Icon name="music" size={size * .52} /></span>
+    <span><strong>{BRAND.primary}</strong><small>AND THE CREWS VAULT</small></span>
+  </span>;
 }
 
 export default function Shell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const [menu, setMenu] = useState(false);
+  const [shortcuts, setShortcuts] = useState(false);
   const nav = useNavigate();
   const loc = useLocation();
-
-  useEffect(() => setMenu(false), [loc.pathname]);
-
+  const toast = useToast();
   const links = [
     { to: "/library", label: "Library", icon: "music" as const },
-    { to: "/shares", label: "Links", icon: "link" as const },
-    { to: "/appearance", label: "Appearance", icon: "sparkles" as const },
+    { to: "/feedback", label: "Review inbox", icon: "comment" as const },
+    { to: "/shares", label: "Shared links", icon: "link" as const },
+    { to: "/appearance", label: "Appearance", icon: "settings" as const },
   ];
+  useEffect(() => setMenu(false), [loc.pathname]);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (el.closest("input,textarea,select,[contenteditable=true],[role=dialog]")) return;
+      if (e.key === "?") { e.preventDefault(); setShortcuts(v => !v); }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
 
-  return (
-    <div className="relative z-10 min-h-screen">
-      <header className="sticky top-0 z-30 px-3 pt-3 sm:px-5 sm:pt-4">
-        <div className="glass mx-auto flex max-w-6xl items-center gap-3 rounded-2xl px-3 py-2.5 sm:px-4">
-          <Link to={user ? "/library" : "/"} className="shrink-0">
-            <Logo />
-          </Link>
+  if (!user) return <div className="relative z-10 min-h-screen">
+    <header className="public-header"><Link to="/"><Logo /></Link><div className="flex items-center gap-2"><Link to="/login" className="btn-ghost">Sign in</Link><Link to="/signup" className="btn-primary">Join free</Link></div></header>
+    <main id="main-content" className="pb-player mx-auto max-w-6xl px-4 pt-8">{children}</main>
+  </div>;
 
-          <nav className="ml-2 hidden items-center gap-1 md:flex">
-            {user &&
-              links.map((l) => {
-                const active = loc.pathname.startsWith(l.to);
-                return (
-                  <Link
-                    key={l.to}
-                    to={l.to}
-                    className="relative rounded-full px-3.5 py-1.5 text-sm font-medium transition"
-                    style={{ color: active ? "rgb(var(--ink-rgb))" : "rgb(var(--muted-rgb))" }}
-                  >
-                    {active && (
-                      <motion.span
-                        layoutId="navpill"
-                        className="absolute inset-0 rounded-full"
-                        style={{ background: "rgb(var(--accent-rgb) / 0.16)" }}
-                        transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                      />
-                    )}
-                    <span className="relative">{l.label}</span>
-                  </Link>
-                );
-              })}
-          </nav>
-
-          <div className="flex-1" />
-
-          {user ? (
-            <div className="relative">
-              <button
-                onClick={() => setMenu((v) => !v)}
-                className="flex items-center gap-2 rounded-full p-1 pr-2 transition hover:bg-white/10"
-              >
-                <Avatar name={user.display_name} src={user.avatar_url} size={30} />
-                <span className="hidden text-sm font-medium sm:block">
-                  {user.display_name.split(" ")[0]}
-                </span>
-              </button>
-
-              <AnimatePresence>
-                {menu && (
-                  <>
-                    <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />
-                    <motion.div
-                      initial={{ opacity: 0, y: -8, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                      transition={{ type: "spring", stiffness: 420, damping: 30 }}
-                      className="glass-strong absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-2xl p-1.5 shadow-lift"
-                    >
-                      <div className="px-3 py-2">
-                        <div className="truncate text-sm font-semibold">
-                          {user.display_name}
-                        </div>
-                        <div className="truncate text-xs text-muted">@{user.handle}</div>
-                      </div>
-                      <div className="my-1 h-px bg-[var(--hairline)]" />
-                      {[
-                        { to: `/u/${user.handle}`, label: "My public page", icon: "user" as const },
-                        ...links,
-                      ].map((l) => (
-                        <Link
-                          key={l.to}
-                          to={l.to}
-                          className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition hover:bg-white/10"
-                        >
-                          <Icon name={l.icon} size={16} />
-                          {l.label}
-                        </Link>
-                      ))}
-                      <div className="my-1 h-px bg-[var(--hairline)]" />
-                      <button
-                        onClick={async () => {
-                          await logout();
-                          nav("/");
-                        }}
-                        className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm text-muted transition hover:bg-white/10 hover:text-ink"
-                      >
-                        <Icon name="logout" size={16} />
-                        Sign out
-                      </button>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <Link to="/login" className="btn-ghost !px-4 !py-2">
-                Sign in
-              </Link>
-              <Link to="/signup" className="btn-primary !px-4 !py-2">
-                Join free
-              </Link>
-            </div>
-          )}
-        </div>
-      </header>
-
-      <main className="pb-player mx-auto max-w-6xl px-3 pt-5 sm:px-5">{children}</main>
-
-      {/* Mobile tab bar, tucked above the player */}
-      {user && (
-        <nav className="glass fixed inset-x-3 z-30 flex items-center justify-around rounded-2xl py-1.5 md:hidden"
-             style={{ bottom: "calc(84px + env(safe-area-inset-bottom))" }}>
-          {links.map((l) => {
-            const active = loc.pathname.startsWith(l.to);
-            return (
-              <Link
-                key={l.to}
-                to={l.to}
-                className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 text-[11px] font-medium transition"
-                style={{ color: active ? "rgb(var(--accent-rgb))" : "rgb(var(--muted-rgb))" }}
-              >
-                <Icon name={l.icon} size={19} />
-                {l.label}
-              </Link>
-            );
-          })}
-        </nav>
-      )}
-    </div>
-  );
+  return <div className="studio-shell">
+    <a href="#main-content" className="skip-link">Skip to content</a>
+    <aside className="studio-sidebar">
+      <Link to="/library" className="studio-logo"><Logo /></Link>
+      <div className="workspace-label">YOUR WORKSPACE</div>
+      <nav aria-label="Workspace" className="studio-nav">
+        {links.map(l => <Link key={l.to} to={l.to} aria-current={loc.pathname.startsWith(l.to) ? "page" : undefined} className={loc.pathname.startsWith(l.to) ? "active" : ""}><Icon name={l.icon} size={19} />{l.label}{loc.pathname.startsWith(l.to) && <span className="nav-indicator" />}</Link>)}
+      </nav>
+      <div className="sidebar-divider" />
+      <div className="workspace-label">QUICK ACCESS</div>
+      <nav aria-label="Quick access" className="studio-nav secondary">
+        <Link to="/library?favorite=true"><Icon name="heart" size={17} />Favorites</Link>
+        <Link to="/library?status=in_review"><Icon name="comment" size={17} />Ready for review</Link>
+        <Link to="/library?folder_id=none"><Icon name="folder" size={17} />Unfiled tracks</Link>
+      </nav>
+      <div className="sidebar-bottom">
+        <div className="studio-note"><Icon name="lock" size={16} /><div><strong>Your music stays yours.</strong><p>Private until you share it.</p></div></div>
+        <button className="shortcut-trigger" onClick={() => setShortcuts(true)}><span>Keyboard shortcuts</span><kbd>?</kbd></button>
+        <button className="account-button" onClick={() => setMenu(true)} aria-label="Account settings"><Avatar name={user.display_name} src={user.avatar_url} size={35} /><span><strong>{user.display_name}</strong><small>@{user.handle}</small></span><Icon name="chevron" size={15} /></button>
+      </div>
+    </aside>
+    <header className="studio-topbar"><div className="breadcrumb"><span>Workspace</span><Icon name="chevron" size={13} /><strong>{links.find(l => loc.pathname.startsWith(l.to))?.label ?? (loc.pathname.startsWith("/track/") ? "Track studio" : "Artist profile")}</strong></div><span className="topbar-private"><Icon name="lock" size={13} />Personal vault</span><button className="mobile-account icon-button" onClick={() => setMenu(true)} aria-label="Account settings"><Avatar name={user.display_name} src={user.avatar_url} size={30} /></button></header>
+    <main id="main-content" className="studio-content" tabIndex={-1}>{children}</main>
+    <nav className="studio-mobile-nav" aria-label="Mobile workspace">
+      {links.map(l => <Link key={l.to} to={l.to} aria-current={loc.pathname.startsWith(l.to) ? "page" : undefined} className={loc.pathname.startsWith(l.to) ? "active" : ""}><Icon name={l.icon} size={19} /><span>{l.label === "Review inbox" ? "Inbox" : l.label === "Shared links" ? "Links" : l.label}</span></Link>)}
+    </nav>
+    <Modal open={menu} onClose={() => setMenu(false)} title="Your account" width={400}>
+      <div className="account-details"><Avatar name={user.display_name} src={user.avatar_url} size={48} /><div><strong>{user.display_name}</strong><p className="text-muted">{user.email}</p></div></div>
+      <Link className="account-link" to={`/u/${user.handle}`}><Icon name="user" />View and edit public profile<Icon name="chevron" size={14} /></Link>
+      <Link className="account-link" to="/appearance"><Icon name="settings" />Customize appearance<Icon name="chevron" size={14} /></Link>
+      <button className="btn-ghost mt-5 w-full" onClick={async () => { try { await logout(); nav("/"); } catch { toast("Could not sign out. Please try again.", "err"); } }}><Icon name="logout" size={16} />Sign out</button>
+    </Modal>
+    <Modal open={shortcuts} onClose={() => setShortcuts(false)} title="Keyboard shortcuts" width={420}>
+      <div className="shortcut-list">{[["Search your library", "/"], ["Play / pause", "Space"], ["Seek 5 seconds", "← / →"], ["Previous / next track", "Shift + ← / →"], ["Close a dialog", "Esc"], ["Show shortcuts", "?"]].map(([label,key]) => <div key={label}><span>{label}</span><kbd>{key}</kbd></div>)}</div>
+    </Modal>
+  </div>;
 }

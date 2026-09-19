@@ -1,9 +1,24 @@
 """Request and response shapes for the API."""
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+TrackStatus = Literal["demo", "in_progress", "in_review", "approved"]
+TrackSort = Literal["recent", "oldest", "title", "longest", "plays", "updated"]
+
+
+class OutputModel(BaseModel):
+    @field_validator("*", mode="after")
+    @classmethod
+    def _utc_dates(cls, value):
+        # SQLite drops timezone information. Every stored date is UTC, and
+        # returning the offset consistently prevents browsers shifting it.
+        if isinstance(value, datetime) and value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
 
 
 class SignUpIn(BaseModel):
@@ -29,7 +44,7 @@ class GoogleIn(BaseModel):
     credential: str
 
 
-class UserOut(BaseModel):
+class UserOut(OutputModel):
     id: str
     email: str
     handle: str
@@ -65,7 +80,7 @@ class FolderIn(BaseModel):
     accent: str = "violet"
 
 
-class FolderOut(BaseModel):
+class FolderOut(OutputModel):
     id: str
     name: str
     accent: str
@@ -90,6 +105,15 @@ class TrackPatch(BaseModel):
     lyrics: str | None = Field(default=None, max_length=20000)
     visibility: str | None = None
     allow_download: bool | None = None
+    status: TrackStatus | None = None
+    is_favorite: bool | None = None
+
+    @field_validator("title", "notes", "lyrics", "visibility", "allow_download", "status", "is_favorite")
+    @classmethod
+    def _not_null(cls, v):
+        if v is None:
+            raise ValueError("This field cannot be null")
+        return v
 
     @field_validator("visibility")
     @classmethod
@@ -99,7 +123,7 @@ class TrackPatch(BaseModel):
         return v
 
 
-class TrackOut(BaseModel):
+class TrackOut(OutputModel):
     id: str
     title: str
     notes: str = ""
@@ -124,6 +148,12 @@ class TrackOut(BaseModel):
     stream_url: str = ""
     # Inherited from the album, so a track shows its cover everywhere.
     cover_url: str = ""
+    status: TrackStatus = "demo"
+    is_favorite: bool = False
+    unresolved_comment_count: int = 0
+    version_root_id: str | None = None
+    version_number: int = 1
+    revision_note: str = ""
 
     class Config:
         from_attributes = True
@@ -134,8 +164,15 @@ class CommentIn(BaseModel):
     at_sec: float | None = Field(default=None, ge=0)
     guest_name: str | None = Field(default=None, max_length=60)
 
+    @field_validator("body")
+    @classmethod
+    def _body(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Write a comment first.")
+        return v.strip()
 
-class CommentOut(BaseModel):
+
+class CommentOut(OutputModel):
     id: str
     body: str
     at_sec: float | None = None
@@ -144,6 +181,65 @@ class CommentOut(BaseModel):
     author_handle: str | None = None
     author_avatar: str | None = None
     is_owner: bool = False
+    resolved: bool = False
+    resolved_at: datetime | None = None
+
+
+class CommentPatch(BaseModel):
+    resolved: bool
+
+
+class FeedbackOut(CommentOut):
+    track_id: str
+    track_title: str
+    track_cover_url: str = ""
+    version_number: int = 1
+    track_status: TrackStatus = "demo"
+
+
+class LibraryFilters(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    q: str = Field(default="", max_length=120)
+    folder_id: str | None = Field(default=None, max_length=40)
+    tag: str | None = Field(default=None, max_length=30)
+    sort: TrackSort = "recent"
+    status: TrackStatus | None = None
+    favorite: bool | None = None
+    latest_only: bool = True
+
+
+class LibraryViewIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    filters: LibraryFilters
+
+    @field_validator("name")
+    @classmethod
+    def _name(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Give this view a name.")
+        return v.strip()
+
+
+class LibraryViewPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=80)
+    filters: LibraryFilters | None = None
+
+    @field_validator("name", "filters")
+    @classmethod
+    def _present(cls, v):
+        if v is None or isinstance(v, str) and not v.strip():
+            raise ValueError("This field cannot be empty.")
+        return v.strip() if isinstance(v, str) else v
+
+
+class LibraryViewOut(OutputModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    name: str
+    filters: LibraryFilters
+    created_at: datetime
+    updated_at: datetime
 
 
 class ShareIn(BaseModel):
@@ -155,7 +251,7 @@ class ShareIn(BaseModel):
     expires_in_days: int | None = Field(default=None, ge=1, le=365)
 
 
-class ShareOut(BaseModel):
+class ShareOut(OutputModel):
     id: str
     token: str
     # Filled in by the router, which knows the public base URL.
@@ -194,6 +290,9 @@ class ThemePatch(BaseModel):
     video_id: str | None = None
     video_fit: str | None = None
     video_dim: float | None = Field(default=None, ge=0, le=1)
+    crossfade: float | None = Field(default=None, ge=0, le=12)
+    skip_silence: bool | None = None
+    performance: str | None = None
     mode: str | None = None
 
     @field_validator("mode")
@@ -203,6 +302,13 @@ class ThemePatch(BaseModel):
             raise ValueError("mode must be dark or light")
         return v
 
+    @field_validator("performance")
+    @classmethod
+    def _performance(cls, v: str | None) -> str | None:
+        if v is not None and v not in {"auto", "high", "low"}:
+            raise ValueError("performance must be auto, high or low")
+        return v
+
 
 class BulkAction(BaseModel):
     """Move or delete many tracks at once from the library's selection mode."""
@@ -210,10 +316,12 @@ class BulkAction(BaseModel):
     track_ids: list[str] = Field(min_length=1, max_length=500)
     folder_id: str | None = None
     add_tags: list[str] | None = None
-    visibility: str | None = None
+    visibility: Literal["private", "unlisted", "public"] | None = None
+    status: TrackStatus | None = None
+    is_favorite: bool | None = None
 
 
-class VideoOut(BaseModel):
+class VideoOut(OutputModel):
     id: str
     name: str
     duration: float

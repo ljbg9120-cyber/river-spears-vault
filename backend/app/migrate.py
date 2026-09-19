@@ -18,9 +18,18 @@ log = logging.getLogger("vault.migrate")
 ADDITIONS: dict[str, dict[str, str]] = {
     "tracks": {
         "lyrics": "TEXT NOT NULL DEFAULT ''",
+        "status": "VARCHAR(16) NOT NULL DEFAULT 'demo'",
+        "is_favorite": "BOOLEAN NOT NULL DEFAULT 0",
+        "version_root_id": "VARCHAR(32)",
+        "version_number": "INTEGER NOT NULL DEFAULT 1",
+        "revision_note": "TEXT NOT NULL DEFAULT ''",
     },
     "folders": {
         "cover_name": "VARCHAR(64)",
+    },
+    "comments": {
+        "resolved": "BOOLEAN NOT NULL DEFAULT 0",
+        "resolved_at": "DATETIME",
     },
 }
 

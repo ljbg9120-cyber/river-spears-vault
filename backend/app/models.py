@@ -52,6 +52,12 @@ DEFAULT_THEME: dict = {
     "video_id": None,
     "video_fit": "cover",
     "video_dim": 0.45,
+    # Playback: seconds of overlap between tracks. 0 turns it off.
+    "crossfade": 0.0,
+    # Skip silence at the head and tail of a track when crossfading.
+    "skip_silence": True,
+    # auto | high | low -- how hard the interface is allowed to work.
+    "performance": "auto",
 }
 
 
@@ -117,6 +123,13 @@ class Track(Base):
     notes: Mapped[str] = mapped_column(Text, default="")
     bpm: Mapped[int | None] = mapped_column(Integer, default=None)
     song_key: Mapped[str | None] = mapped_column(String(12), default=None)
+    status: Mapped[str] = mapped_column(String(16), default="demo")
+    is_favorite: Mapped[bool] = mapped_column(Boolean, default=False)
+    # A stable family key, deliberately not a cascading foreign key: removing an
+    # old version must never remove the newer audio or its feedback.
+    version_root_id: Mapped[str | None] = mapped_column(String(32), default=None)
+    version_number: Mapped[int] = mapped_column(Integer, default=1)
+    revision_note: Mapped[str] = mapped_column(Text, default="")
 
     stored_name: Mapped[str] = mapped_column(String(80))
     original_name: Mapped[str] = mapped_column(String(260))
@@ -171,6 +184,8 @@ class Comment(Base):
     body: Mapped[str] = mapped_column(Text)
     # Seconds into the track; null for a general comment.
     at_sec: Mapped[float | None] = mapped_column(Float, default=None)
+    resolved: Mapped[bool] = mapped_column(Boolean, default=False)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, index=True)
 
     track: Mapped[Track] = relationship(back_populates="comments")
@@ -220,6 +235,21 @@ class ShareLink(Base):
 
     track: Mapped[Track | None] = relationship(back_populates="shares")
     folder: Mapped[Folder | None] = relationship()
+
+
+class LibraryView(Base):
+    """An owner's named, validated library filters, available on every device."""
+
+    __tablename__ = "library_views"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uid)
+    owner_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(80))
+    filters: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
 
 class VideoLoop(Base):

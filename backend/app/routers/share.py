@@ -12,7 +12,7 @@ from ..db import get_db
 from ..models import Folder, ShareLink, Track, User
 from ..schemas import PublicUser, ShareIn, ShareOut
 from ..security import current_user, current_user_optional
-from ..serializers import cover_url, track_out
+from ..serializers import cover_url, tracks_out
 
 router = APIRouter(prefix="/api", tags=["share"])
 settings = get_settings()
@@ -106,7 +106,7 @@ def open_share(
     else:
         tracks = (
             db.query(Track)
-            .filter(Track.folder_id == link.folder_id)
+            .filter(Track.folder_id == link.folder_id, Track.version_number == 1)
             .order_by(Track.created_at.asc())
             .all()
         )
@@ -122,5 +122,5 @@ def open_share(
         "allow_comments": link.allow_comments,
         "cover_url": cover_url(folder, token),
         "owner": PublicUser.model_validate(owner, from_attributes=True),
-        "tracks": [track_out(db, t, viewer, token) for t in tracks],
+        "tracks": tracks_out(db, tracks, viewer, token),
     }

@@ -11,8 +11,10 @@ import Visualizer from "./Visualizer";
 import Waveform from "./Waveform";
 
 export default function Player() {
-  const { current, playing, time, duration, volume, toggle, seek, next, prev, setVolume } =
-    usePlayer();
+  const {
+    current, playing, time, duration, volume, toggle, seek, next, prev, setVolume,
+    shuffle, repeat, toggleShuffle, cycleRepeat, crossfading,
+  } = usePlayer();
   const { theme } = useAuth();
   const [expanded, setExpanded] = useState(false);
 
@@ -161,6 +163,32 @@ export default function Player() {
                     aria-label="Next"
                   >
                     <Icon name="next" size={18} />
+                  </button>
+
+                  <button
+                    onClick={toggleShuffle}
+                    className="hidden rounded-full p-2 transition hover:bg-white/10 sm:block"
+                    style={{ color: shuffle ? "rgb(var(--accent-rgb))" : "rgb(var(--muted-rgb))" }}
+                    aria-label="Shuffle"
+                    aria-pressed={shuffle}
+                    title={shuffle ? "Shuffle on" : "Shuffle off"}
+                  >
+                    <Icon name="shuffle" size={16} />
+                  </button>
+
+                  <button
+                    onClick={cycleRepeat}
+                    className="relative hidden rounded-full p-2 transition hover:bg-white/10 sm:block"
+                    style={{
+                      color: repeat === "off" ? "rgb(var(--muted-rgb))" : "rgb(var(--accent-rgb))",
+                    }}
+                    aria-label={`Repeat: ${repeat}`}
+                    title={repeat === "off" ? "Repeat off" : repeat === "all" ? "Repeat queue" : "Repeat this track"}
+                  >
+                    <Icon name="repeat" size={16} />
+                    {repeat === "one" && (
+                      <span className="absolute right-1 top-1 font-mono text-[9px] font-bold">1</span>
+                    )}
                   </button>
 
                   <button

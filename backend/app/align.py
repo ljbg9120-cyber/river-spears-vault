@@ -14,6 +14,7 @@ tap-sync still works.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import threading
 import unicodedata
@@ -23,7 +24,11 @@ from pathlib import Path
 
 log = logging.getLogger("vault.align")
 
-MODEL_SIZE = "small"
+# "small" is the best of these at hearing singing, but wants ~2 GB. "base"
+# is noticeably rougher, which matters less here than it would for plain
+# transcription: the transcript is only ever matched against lyrics the
+# artist already typed, so it needs anchor words, not perfect words.
+MODEL_SIZE = os.environ.get("VAULT_WHISPER_MODEL", "small")
 _model = None
 _model_device = "none"
 _model_lock = threading.Lock()

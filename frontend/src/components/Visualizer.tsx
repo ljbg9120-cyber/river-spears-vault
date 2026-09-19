@@ -8,6 +8,7 @@
  */
 import { useEffect, useRef } from "react";
 import type { Theme } from "../lib/api";
+import { getProfile } from "../lib/perf";
 import { hexToRgb, usePlayer } from "../lib/store";
 
 export const VISUALIZERS = [
@@ -82,7 +83,7 @@ export default function Visualizer({
     let lastBeat = 0;
 
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = Math.min(window.devicePixelRatio || 1, getProfile().dpr);
       w = canvas.clientWidth;
       h = canvas.clientHeight;
       canvas.width = Math.max(1, Math.floor(w * dpr));
@@ -109,11 +110,21 @@ export default function Visualizer({
       return { bins, energy, bass };
     };
 
-    const draw = () => {
+    let lastPaint = 0;
+    const draw = (now?: number) => {
       raf = requestAnimationFrame(draw);
       frame++;
       // Previews idle at half rate; the real thing always runs full speed.
       if (conf.current.preview && frame % 2) return;
+
+      // On a weak machine, hold to the profile's frame budget instead of
+      // fighting for 60 and dropping frames unevenly.
+      const perf = getProfile();
+      const stamp = now ?? performance.now();
+      if (perf.fps < 60) {
+        if (stamp - lastPaint < 1000 / perf.fps - 1) return;
+        lastPaint = stamp;
+      }
 
       const th = conf.current.theme;
       const which = conf.current.style ?? th.visualizer ?? "bars";
@@ -130,6 +141,7 @@ export default function Visualizer({
       const cx = w / 2;
       const cy = h / 2;
       const min = Math.min(w, h);
+      const many = (n: number) => Math.max(8, Math.round(n * perf.density));
 
       /** Bin for a point at `p` (0..1) around a circle, mirrored so both
        *  halves match instead of sweeping loud-to-quiet around one side. */
@@ -137,6 +149,9 @@ export default function Visualizer({
         bins[Math.min(bins.length - 1, Math.floor(Math.abs(p * 2 - 1) * bins.length))];
 
       const glow = (colour: string, blur: number) => {
+        // Canvas shadow blur is the single most expensive thing drawn here;
+        // the low profile draws the same shapes without it.
+        if (!perf.glow) { ctx.shadowBlur = 0; return; }
         ctx.shadowColor = colour;
         ctx.shadowBlur = conf.current.preview ? blur * 0.4 : blur;
       };
@@ -146,7 +161,7 @@ export default function Visualizer({
 
       switch (which) {
         case "bars": {
-          const count = 56;
+          const count = many(56);
           const bw = w / count;
           glow(css(b, 0.9), 22);
           for (let i = 0; i < count; i++) {
@@ -168,7 +183,7 @@ export default function Visualizer({
         }
 
         case "mirror": {
-          const count = 56;
+          const count = many(56);
           const bw = w / count;
           glow(css(a, 0.9), 24);
           for (let i = 0; i < count; i++) {
@@ -259,7 +274,7 @@ export default function Visualizer({
 
         case "ring": {
           const inner = min * 0.2 * scale;
-          const count = 96;
+          const count = many(96);
           glow(css(a, 0.8), 18);
           for (let i = 0; i < count; i++) {
             const ang = (i / count) * Math.PI * 2 - Math.PI / 2;
@@ -339,7 +354,7 @@ export default function Visualizer({
         }
 
         case "tunnel": {
-          const depth = 14;
+          const depth = many(14);
           glow(css(a, 0.6), 16);
           for (let i = 0; i < depth; i++) {
             // Rings march toward the viewer, looping on a fixed cadence.
@@ -363,7 +378,7 @@ export default function Visualizer({
         }
 
         case "starburst": {
-          const rays = 60;
+          const rays = many(60);
           glow(css(b, 0.9), 22);
           for (let i = 0; i < rays; i++) {
             const ang = (i / rays) * Math.PI * 2 + t * 0.25;
@@ -418,7 +433,7 @@ export default function Visualizer({
 
         case "spiral": {
           const arms = 3;
-          const pts = 150;
+          const pts = many(150);
           glow(css(b, 0.8), 16);
           for (let arm = 0; arm < arms; arm++) {
             for (let i = 0; i < pts; i++) {

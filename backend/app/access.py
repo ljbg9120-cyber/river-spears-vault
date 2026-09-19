@@ -29,7 +29,10 @@ def link_covers_track(link: ShareLink | None, track: Track) -> bool:
         return False
     if link.track_id and link.track_id == track.id:
         return True
-    if link.folder_id and track.folder_id and link.folder_id == track.folder_id:
+    if (link.folder_id and track.folder_id and link.folder_id == track.folder_id
+            and track.version_number == 1):
+        # Album links keep playing the original cuts. A revision needs its own
+        # explicit share link; uploading a mix never changes a listener's audio.
         return True
     return False
 
