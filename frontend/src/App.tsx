@@ -13,6 +13,7 @@ import SharePage from "./pages/SharePage";
 import Shares from "./pages/Shares";
 import TrackPage from "./pages/TrackPage";
 import Feedback from "./pages/Feedback";
+import Playback from "./pages/Playback";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -75,6 +76,10 @@ export default function App() {
                 <Route
                   path="/feedback"
                   element={<Protected><Feedback /></Protected>}
+                />
+                <Route
+                  path="/playback"
+                  element={<Protected><Playback /></Protected>}
                 />
                 <Route
                   path="/shares"
