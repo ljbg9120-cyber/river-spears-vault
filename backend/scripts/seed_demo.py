@@ -7,6 +7,7 @@ Safe to re-run: it signs in if the demo account already exists.
 """
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -14,7 +15,8 @@ from pathlib import Path
 
 import httpx
 
-BASE = "http://127.0.0.1:8000"
+# Point at a deployed instance with:  VAULT_SEED_BASE=https://your-app.fly.dev
+BASE = os.environ.get("VAULT_SEED_BASE", "http://127.0.0.1:8000")
 EMAIL = "demo@vault.fm"
 PASSWORD = "vaultdemo123"
 NAME = "Nova Reyes"
