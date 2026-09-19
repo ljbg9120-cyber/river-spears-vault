@@ -104,6 +104,30 @@ export default function Appearance() {
             );
           })}
         </div>
+
+        <div className="mt-5">
+          <div className="mb-1.5 flex items-baseline justify-between">
+            <span className="text-sm font-semibold">Make it stand out</span>
+            <span className="font-mono text-xs text-muted">
+              {Math.round((theme.background_boost ?? 0) * 100)}%
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.01}
+            value={theme.background_boost ?? 0}
+            onChange={(e) => nudge({ background_boost: Number(e.target.value) })}
+            className="w-full"
+            aria-label="How much the background stands out"
+          />
+          <p className="mt-1 text-xs text-muted">
+            Thins the panels and lifts the darkening at the edges, so the
+            background comes forward instead of sitting behind the glass. Turn it
+            far up and the interface almost floats on top of it.
+          </p>
+        </div>
       </Section>
 
       {/* ------------------------- visualizer ------------------------- */}

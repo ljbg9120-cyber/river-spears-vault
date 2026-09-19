@@ -58,6 +58,9 @@ DEFAULT_THEME: dict = {
     "skip_silence": True,
     # auto | high | low -- how hard the interface is allowed to work.
     "performance": "auto",
+    # 0 leaves the background behind the glass; 1 pushes it forward, thins
+    # the panels and lifts the vignette so it becomes the main event.
+    "background_boost": 0.0,
 }
 
 
@@ -101,6 +104,7 @@ class Folder(Base):
     accent: Mapped[str] = mapped_column(String(16), default="violet")
     # Base name of the stored cover art; the jpg and its thumb sit beside it.
     cover_name: Mapped[str | None] = mapped_column(String(64), default=None)
+    showcased: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     position: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
@@ -146,6 +150,8 @@ class Track(Base):
 
     # private = owner only, unlisted = anyone with a share link, public = on profile
     visibility: Mapped[str] = mapped_column(String(10), default="private")
+    # Listed on the public showcase, where anyone signed in can rate it.
+    showcased: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     allow_download: Mapped[bool] = mapped_column(Boolean, default=False)
     plays: Mapped[int] = mapped_column(Integer, default=0)
 
@@ -248,6 +254,30 @@ class LibraryView(Base):
     )
     name: Mapped[str] = mapped_column(String(80))
     filters: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+class Rating(Base):
+    """One person's score for one track or album. Changing it overwrites."""
+
+    __tablename__ = "ratings"
+    __table_args__ = (
+        UniqueConstraint("user_id", "track_id", name="uq_rating_track"),
+        UniqueConstraint("user_id", "folder_id", name="uq_rating_folder"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uid)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    track_id: Mapped[str | None] = mapped_column(
+        ForeignKey("tracks.id", ondelete="CASCADE"), index=True, default=None
+    )
+    folder_id: Mapped[str | None] = mapped_column(
+        ForeignKey("folders.id", ondelete="CASCADE"), index=True, default=None
+    )
+    stars: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 

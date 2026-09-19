@@ -78,6 +78,8 @@ export type Theme = {
   crossfade: number;
   skip_silence: boolean;
   performance: "auto" | "high" | "low";
+  /** 0 keeps the background behind the glass, 1 brings it forward. */
+  background_boost: number;
 };
 
 export type User = {
@@ -195,6 +197,23 @@ export type VideoLoop = {
   created_at: string;
   src_url: string;
   poster_url: string;
+};
+
+export type ShowcaseItem = {
+  kind: "track" | "album";
+  id: string;
+  title: string;
+  cover_url: string;
+  owner: PublicUser;
+  created_at: string;
+  rating_avg: number;
+  rating_count: number;
+  /** Your own score, if you have given one. */
+  my_rating: number | null;
+  duration: number;
+  stream_url: string;
+  track_count: number;
+  tags: string[];
 };
 
 export type SharePayload = {

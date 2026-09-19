@@ -66,10 +66,14 @@ export default function Background({ theme }: { theme: Theme }) {
 
 /** A constant accent wash so even "none" is not flat black. */
 function BaseWash({ theme }: { theme: Theme }) {
+  // A boosted background gets a stronger wash under it so the colour
+  // carries all the way to the edges instead of fading into the panel.
+  const boost = theme.background_boost ?? 0;
   return (
     <div
       className="absolute inset-0"
       style={{
+        opacity: 1 + boost * 0.9,
         background:
           theme.mode === "light"
             ? `radial-gradient(1200px 700px at 15% -10%, ${theme.accent}18, transparent 60%),
@@ -83,12 +87,16 @@ function BaseWash({ theme }: { theme: Theme }) {
 
 function Vignette({ theme }: { theme: Theme }) {
   if (theme.mode === "light") return null;
+  // The vignette exists to keep text readable over a busy background. Turning
+  // the background up should lift it, not remove it entirely.
+  const boost = theme.background_boost ?? 0;
+  const edge = 0.55 * (1 - boost * 0.8);
   return (
     <div
       className="absolute inset-0"
       style={{
         background:
-          "radial-gradient(120% 100% at 50% 40%, transparent 40%, rgba(0,0,0,0.55) 100%)",
+          `radial-gradient(120% 100% at 50% 40%, transparent 40%, rgba(0,0,0,${edge.toFixed(3)}) 100%)`,
       }}
     />
   );

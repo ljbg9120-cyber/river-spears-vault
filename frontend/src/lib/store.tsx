@@ -32,6 +32,7 @@ export const DEFAULT_THEME: Theme = {
   crossfade: 0,
   skip_silence: true,
   performance: "auto",
+  background_boost: 0,
 };
 
 export function hexToRgb(hex: string): string {
@@ -48,6 +49,20 @@ export function applyTheme(theme: Theme) {
   root.dataset.mode = theme.mode;
   // Drawing effort follows the saved preference; "auto" measures instead.
   setPerfSetting(theme.performance ?? "auto");
+
+  // Making the background "stand out" is mostly a matter of getting the glass
+  // out of its way: thinner panels and a lighter vignette let it through.
+  const boost = Math.max(0, Math.min(1, theme.background_boost ?? 0));
+  root.style.setProperty("--bg-boost", String(boost));
+  const light = theme.mode === "light";
+  const base = light ? 0.66 : 0.045;
+  const strong = light ? 0.85 : 0.075;
+  const tint = light ? "255, 255, 255" : "255, 255, 255";
+  root.style.setProperty("--panel", `rgba(${tint}, ${(base * (1 - boost * 0.75)).toFixed(3)})`);
+  root.style.setProperty(
+    "--panel-strong",
+    `rgba(${tint}, ${(strong * (1 - boost * 0.6)).toFixed(3)})`,
+  );
   root.style.setProperty("--motion", String(theme.speed));
   document
     .querySelector('meta[name="theme-color"]')

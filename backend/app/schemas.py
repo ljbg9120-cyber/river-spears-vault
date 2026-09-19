@@ -293,6 +293,7 @@ class ThemePatch(BaseModel):
     crossfade: float | None = Field(default=None, ge=0, le=12)
     skip_silence: bool | None = None
     performance: str | None = None
+    background_boost: float | None = Field(default=None, ge=0, le=1)
     mode: str | None = None
 
     @field_validator("mode")
@@ -340,3 +341,26 @@ class VideoOut(OutputModel):
 
 class VideoRename(BaseModel):
     name: str = Field(min_length=1, max_length=120)
+
+
+class RateIn(BaseModel):
+    stars: int = Field(ge=1, le=5)
+
+
+class ShowcaseItem(BaseModel):
+    """A track or album published to the public showcase."""
+
+    kind: str                       # "track" or "album"
+    id: str
+    title: str
+    cover_url: str = ""
+    owner: PublicUser
+    created_at: datetime
+    rating_avg: float = 0.0
+    rating_count: int = 0
+    my_rating: int | None = None
+    # Tracks carry playback; albums carry a count.
+    duration: float = 0.0
+    stream_url: str = ""
+    track_count: int = 0
+    tags: list[str] = []
