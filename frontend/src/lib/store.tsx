@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { api, ApiError, type Theme, type Track, type User } from "./api";
+import { loadFont } from "./fonts";
 import { setPerfSetting } from "./perf";
 
 // ---------------------------------------------------------------------------
@@ -56,25 +57,11 @@ export function applyTheme(theme: Theme) {
   const boost = Math.max(0, Math.min(1, theme.background_boost ?? 0));
   root.style.setProperty("--bg-boost", String(boost));
 
-  // Fonts load on demand: one stylesheet element, swapped when the choice
-  // changes, so an unused typeface is never fetched.
+  // Fonts load on demand through the shared loader, which remembers what it
+  // has already fetched.
   const font = theme.font || "Outfit";
   root.style.setProperty("--font-display", `"${font}"`);
-  if (font !== "Outfit") {
-    const id = "vault-font";
-    let link = document.getElementById(id) as HTMLLinkElement | null;
-    const href =
-      "https://fonts.googleapis.com/css2?family=" +
-      encodeURIComponent(font).replace(/%20/g, "+") +
-      ":wght@400;600;700;800&display=swap";
-    if (!link) {
-      link = document.createElement("link");
-      link.id = id;
-      link.rel = "stylesheet";
-      document.head.appendChild(link);
-    }
-    if (link.href !== href) link.href = href;
-  }
+  loadFont(font);
   const light = theme.mode === "light";
   const base = light ? 0.66 : 0.045;
   const strong = light ? 0.85 : 0.075;

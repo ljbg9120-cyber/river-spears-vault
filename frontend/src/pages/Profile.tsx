@@ -3,12 +3,14 @@ import { motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import TrackRow from "../components/TrackRow";
+import FontPicker from "../components/FontPicker";
 import { ProfileEffectLayer, frameRadius, frameStyle } from "../components/ProfileDecor";
 import { Avatar, Empty, Icon, Modal, Spinner, useToast } from "../components/ui";
 import {
   api, AVATAR_FRAMES, PROFILE_EFFECTS, type AvatarFrame, type FollowState,
   type ProfileEffect, type ProfileLink, type PublicUser, type Track, type User,
 } from "../lib/api";
+import { fontStack, glowStyle, loadFont } from "../lib/fonts";
 import { useAuth, usePlayer } from "../lib/store";
 
 type ProfileData = {
@@ -37,6 +39,11 @@ export default function Profile() {
     setLoading(true);
     load().catch(() => setData(null)).finally(() => setLoading(false));
   }, [load]);
+
+  // A profile can be written in its owner's typeface, not the viewer's.
+  useEffect(() => {
+    if (data?.user.profile_font) loadFont(data.user.profile_font);
+  }, [data?.user.profile_font]);
 
   const toggleFollow = async () => {
     if (!user) { toast("Sign in to follow people", "err"); return; }
@@ -136,8 +143,12 @@ export default function Profile() {
           <div className="mt-3">
             <h1
               className="title-xl text-2xl sm:text-3xl"
-              style={
-                p.profile_accent2
+              style={{
+                fontFamily: p.profile_font ? fontStack(p.profile_font) : undefined,
+                // A gradient fill paints the text transparent, and a shadow
+                // under transparent text shows through as a halo — which is
+                // exactly the glow, so the two combine rather than conflict.
+                ...(p.profile_accent2
                   ? {
                       backgroundImage: `linear-gradient(100deg, ${accent}, ${p.profile_accent2})`,
                       WebkitBackgroundClip: "text",
@@ -146,8 +157,9 @@ export default function Profile() {
                     }
                   : p.profile_accent
                     ? { color: p.profile_accent }
-                    : undefined
-              }
+                    : {}),
+                textShadow: glowStyle(p.profile_glow ?? 0, accent),
+              }}
             >
               {p.display_name}
               {p.pronouns && (
@@ -158,7 +170,14 @@ export default function Profile() {
             </h1>
             <p className="text-sm text-muted">@{p.handle}</p>
             {p.status_text && (
-              <p className="mt-1 text-sm" style={{ color: accent }}>
+              <p
+                className="mt-1 text-sm"
+                style={{
+                  color: accent,
+                  fontFamily: p.profile_font ? fontStack(p.profile_font) : undefined,
+                  textShadow: glowStyle((p.profile_glow ?? 0) * 0.6, accent),
+                }}
+              >
                 {p.status_text}
               </p>
             )}
@@ -303,6 +322,8 @@ function EditProfile({
   const [frame, setFrame] = useState<AvatarFrame>(me.avatar_frame ?? "none");
   const [focus, setFocus] = useState(me.banner_focus ?? "center");
   const [songId, setSongId] = useState<string | null>(me.profile_song_id ?? null);
+  const [font, setFont] = useState(me.profile_font ?? "");
+  const [glow, setGlow] = useState(me.profile_glow ?? 0);
   const [myTracks, setMyTracks] = useState<Track[]>([]);
   const [uploading, setUploading] = useState<"avatar" | "banner" | null>(null);
   const [error, setError] = useState("");
@@ -350,6 +371,8 @@ function EditProfile({
         avatar_frame: frame,
         banner_focus: focus,
         profile_song_id: songId,
+        profile_font: font,
+        profile_glow: glow,
         links: links.filter((l) => l.url.trim()),
       }));
       onClose();
@@ -527,6 +550,60 @@ function EditProfile({
             public so visitors can actually hear it.
           </span>
         </label>
+
+        <div>
+          <div className="mb-1.5 flex items-baseline justify-between">
+            <span className="text-xs uppercase tracking-wider text-muted">
+              Profile typeface
+            </span>
+            {font && (
+              <button onClick={() => setFont("")} className="text-[11px] text-muted underline">
+                use the default
+              </button>
+            )}
+          </div>
+          <FontPicker
+            value={font}
+            onPick={setFont}
+            glow={glow}
+            accent={accent || "#7c5cff"}
+            sample={name.slice(0, 2) || "Aa"}
+          />
+          <p className="mt-1.5 text-[11px] text-muted">
+            This is what visitors see on your page, whatever font they use
+            elsewhere.
+          </p>
+        </div>
+
+        <div>
+          <div className="mb-1.5 flex items-baseline justify-between">
+            <span className="text-xs uppercase tracking-wider text-muted">Glow</span>
+            <span className="font-mono text-xs text-muted">
+              {glow > 0 ? `${Math.round(glow * 100)}%` : "off"}
+            </span>
+          </div>
+          <input
+            type="range" min={0} max={1} step={0.05} value={glow}
+            onChange={(e) => setGlow(Number(e.target.value))}
+            className="w-full" aria-label="Name glow"
+          />
+          <p
+            className="mt-2 text-center text-2xl font-bold"
+            style={{
+              fontFamily: font ? `"${font}", Outfit, sans-serif` : undefined,
+              color: glow ? (accent || "#7c5cff") : undefined,
+              textShadow: glow
+                ? [4, 12, 28, 52].map((r) => `0 0 ${(r * glow).toFixed(1)}px ${accent || "#7c5cff"}`).join(", ")
+                : undefined,
+            }}
+          >
+            {name || "Your name"}
+          </p>
+          <p className="mt-1 text-[11px] text-muted">
+            Lights your name up in your profile colour. Pairs well with Monoton
+            or Audiowide.
+          </p>
+        </div>
 
         {error && <p className="text-sm" style={{ color: "#ff8098" }}>{error}</p>}
         <button onClick={save} className="btn-primary w-full">Save profile</button>

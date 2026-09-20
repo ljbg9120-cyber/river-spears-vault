@@ -22,11 +22,34 @@ settings = get_settings()
 
 # Typefaces a profile can be written in. Each is a Google Font the client
 # loads on demand, so the list costs nothing until one is picked.
-FONTS = [
-    "Outfit", "Inter", "Space Grotesk", "Poppins", "Playfair Display",
-    "Bebas Neue", "Archivo Black", "DM Serif Display", "JetBrains Mono",
-    "Rubik", "Lora", "Chakra Petch",
-]
+FONT_GROUPS: dict[str, list[str]] = {
+    "Clean": [
+        "Outfit", "Inter", "Poppins", "Space Grotesk", "Rubik", "Manrope",
+        "Sora", "Work Sans", "Montserrat", "Raleway",
+    ],
+    "Bold display": [
+        "Bebas Neue", "Anton", "Archivo Black", "Staatliches", "Fjalla One",
+        "Passion One", "Titan One", "Alfa Slab One", "Righteous", "Bungee",
+    ],
+    "Neon and retro": [
+        "Monoton", "Audiowide", "Orbitron", "Russo One", "Black Ops One",
+        "Syncopate", "Chakra Petch", "Press Start 2P", "Silkscreen", "VT323",
+    ],
+    "Serif": [
+        "Playfair Display", "DM Serif Display", "Abril Fatface", "Lora",
+        "Cormorant Garamond", "Bodoni Moda",
+    ],
+    "Handwritten": [
+        "Pacifico", "Caveat", "Satisfy", "Dancing Script",
+        "Permanent Marker", "Shadows Into Light",
+    ],
+    "Monospace": [
+        "JetBrains Mono", "Space Mono", "Share Tech Mono", "Major Mono Display",
+    ],
+}
+
+# Flat list for validation.
+FONTS = [name for group in FONT_GROUPS.values() for name in group]
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +287,12 @@ def following(handle: str, db: Session = Depends(get_db), limit: int = 100):
 @router.get("/fonts", response_model=list[str])
 def list_fonts() -> list[str]:
     return FONTS
+
+
+@router.get("/fonts/groups")
+def list_font_groups() -> dict[str, list[str]]:
+    """Grouped for the picker, so 40-odd names are not one undifferentiated wall."""
+    return FONT_GROUPS
 
 
 @router.get("/users/search", response_model=list[PublicUser])

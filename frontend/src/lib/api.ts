@@ -128,6 +128,10 @@ export type User = {
   banner_focus: "top" | "center" | "bottom";
   profile_layout: "card" | "wide";
   status_text: string;
+  /** Typeface visitors see on this profile. Empty uses their own setting. */
+  profile_font: string;
+  /** 0 is flat; higher lights the name up in the profile colour. */
+  profile_glow: number;
   theme: Theme;
   created_at: string;
 };

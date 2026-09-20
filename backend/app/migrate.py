@@ -40,6 +40,8 @@ ADDITIONS: dict[str, dict[str, str]] = {
         "banner_focus": "VARCHAR(10) NOT NULL DEFAULT 'center'",
         "profile_layout": "VARCHAR(10) NOT NULL DEFAULT 'card'",
         "status_text": "VARCHAR(80) NOT NULL DEFAULT ''",
+        "profile_font": "VARCHAR(48) NOT NULL DEFAULT ''",
+        "profile_glow": "FLOAT NOT NULL DEFAULT 0",
     },
     "folders": {
         "cover_name": "VARCHAR(64)",

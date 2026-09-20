@@ -67,6 +67,8 @@ class UserOut(OutputModel):
     banner_focus: str = "center"
     profile_layout: str = "card"
     status_text: str = ""
+    profile_font: str = ""
+    profile_glow: float = 0.0
     theme: dict = {}
     created_at: datetime
 
@@ -94,6 +96,8 @@ class PublicUser(BaseModel):
     banner_focus: str = "center"
     profile_layout: str = "card"
     status_text: str = ""
+    profile_font: str = ""
+    profile_glow: float = 0.0
     badges: list[dict] = []
 
     _links_null = field_validator("links", mode="before")(_as_list)
@@ -316,6 +320,8 @@ class ProfilePatch(BaseModel):
     banner_focus: str | None = None
     profile_layout: str | None = None
     status_text: str | None = Field(default=None, max_length=80)
+    profile_font: str | None = None
+    profile_glow: float | None = Field(default=None, ge=0, le=1)
 
 
 class ThemePatch(BaseModel):

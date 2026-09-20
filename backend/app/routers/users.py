@@ -60,6 +60,12 @@ def update_profile(
         if field in data and data[field] not in allowed:
             raise HTTPException(422, f"{field} must be one of: {', '.join(sorted(allowed))}")
 
+    if data.get("profile_font"):
+        from .profiles import FONTS
+
+        if data["profile_font"] not in FONTS:
+            raise HTTPException(422, "Unknown font: " + str(data["profile_font"]))
+
     if data.get("profile_song_id"):
         from ..models import Track
 

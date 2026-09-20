@@ -105,6 +105,10 @@ class User(Base):
     profile_layout: Mapped[str] = mapped_column(String(10), default="card")
     # One line under the name, like "working on the album".
     status_text: Mapped[str] = mapped_column(String(80), default="")
+    # The typeface visitors see on this profile. Empty uses their own setting.
+    profile_font: Mapped[str] = mapped_column(String(48), default="")
+    # 0 is flat; higher values light the name up in the profile colour.
+    profile_glow: Mapped[float] = mapped_column(Float, default=0.0)
     # Appearance: which animated background plays, accent colour, motion amount.
     # Travels with every page this user shares, so listeners see their vibe.
     theme: Mapped[dict] = mapped_column(JSON, default=lambda: dict(DEFAULT_THEME))
