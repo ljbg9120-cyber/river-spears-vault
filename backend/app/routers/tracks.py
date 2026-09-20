@@ -105,6 +105,8 @@ async def _store_audio(upload_file: UploadFile) -> dict:
 async def upload(
     files: list[UploadFile] = File(...),
     folder_id: str | None = Form(default=None),
+    notes: str = Form(default="", max_length=4000),
+    allow_download: bool = Form(default=False),
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
@@ -119,7 +121,12 @@ async def upload(
             metadata = await _store_audio(upload_file)
             track = Track(
                 owner_id=user.id, folder_id=folder_id or None,
-                title=_clean_title(upload_file.filename or "Untitled"), **metadata,
+                title=_clean_title(upload_file.filename or "Untitled"),
+                # Applied to everything in the batch: a description written at
+                # upload describes the drop, not one file in it.
+                notes=notes.strip(),
+                allow_download=allow_download,
+                **metadata,
             )
             db.add(track)
             created.append(track)

@@ -186,6 +186,33 @@ export default function TrackPage() {
             {isOwner && <button className="btn-ghost" onClick={() => setShareOpen(true)}><Icon name="share" size={16} />Share</button>}
             <button className="btn-ghost" onClick={() => { addToQueue(track, token); toast("Added to queue"); }}><Icon name="plus" size={16} />Queue</button>
             {(track.allow_download || isOwner) && <a href={`/api/tracks/${track.id}/download${suffix}`} className="btn-ghost" aria-label="Download this version"><Icon name="download" size={16} /><span className="review-download-label">Download</span></a>}
+            {isOwner && (
+              <button
+                onClick={async () => {
+                  try {
+                    setTrack(await api.patch<Track>(`/api/tracks/${track.id}`, {
+                      allow_download: !track.allow_download,
+                    }));
+                    toast(track.allow_download
+                      ? "Downloads locked — people can listen, not keep it"
+                      : "Downloads unlocked");
+                  } catch (err) {
+                    toast(err instanceof Error ? err.message : "Could not change that", "err");
+                  }
+                }}
+                className="btn-ghost"
+                title={track.allow_download
+                  ? "Anyone who can hear it can download it"
+                  : "Listeners cannot download the file"}
+                aria-pressed={track.allow_download}
+                style={{ color: track.allow_download ? "rgb(var(--accent-rgb))" : undefined }}
+              >
+                <Icon name={track.allow_download ? "download" : "lock"} size={16} />
+                <span className="review-download-label">
+                  {track.allow_download ? "Downloads on" : "Downloads locked"}
+                </span>
+              </button>
+            )}
             {!isOwner && user && <button onClick={toggleLike} disabled={saving} className="btn-ghost" aria-label="Like this track"><Icon name="heart" size={16} filled={track.liked_by_me} />{track.like_count || "Like"}</button>}
           </div>
           {isOwner && <div className="review-workflow">

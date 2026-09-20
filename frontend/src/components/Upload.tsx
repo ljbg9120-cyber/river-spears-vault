@@ -11,6 +11,8 @@ type Job = {
   size: number;
   file?: File;
   folderId?: string | null;
+  notes?: string;
+  allowDownload?: boolean;
   progress: number;
   status: Status;
   message?: string;
@@ -28,6 +30,9 @@ export default function Upload({ folderId, onDone, compact = false }: {
   const [dragging, setDragging] = useState(false);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [maxMb, setMaxMb] = useState<number | null>(null);
+  const [notes, setNotes] = useState("");
+  // Locked by default: an upload is private until its owner says otherwise.
+  const [allowDownload, setAllowDownload] = useState(false);
   const jobsRef = useRef<Job[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const activeRef = useRef<{ id: string; xhr: XMLHttpRequest } | null>(null);
@@ -78,12 +83,13 @@ export default function Upload({ folderId, onDone, compact = false }: {
         : maxMb && file.size > maxMb * 1024 * 1024 ? `Over the ${maxMb} MB per-file limit.` : undefined;
       additions.push({
         id: crypto.randomUUID(), name: file.name, size: file.size, folderId,
+        notes, allowDownload,
         file: message ? undefined : file, progress: 0,
         status: message ? "error" : "queued", message, retryable: false,
       });
     }
     update((previous) => [...previous, ...additions]);
-  }, [folderId, maxMb, toast, update]);
+  }, [folderId, maxMb, notes, allowDownload, toast, update]);
 
   // A single request at a time prevents large batches competing for memory.
   useEffect(() => {
@@ -142,6 +148,8 @@ export default function Upload({ folderId, onDone, compact = false }: {
     const form = new FormData();
     form.append("files", job.file);
     if (job.folderId) form.append("folder_id", job.folderId);
+    if (job.notes?.trim()) form.append("notes", job.notes.trim());
+    form.append("allow_download", job.allowDownload ? "true" : "false");
     patch(job.id, { status: "uploading", progress: 0, message: undefined });
     try { xhr.send(form); }
     catch { finish({ status: "error", message: "The upload could not start. Try again.", retryable: true }); }
@@ -198,6 +206,39 @@ export default function Upload({ folderId, onDone, compact = false }: {
     </button>
     <input ref={inputRef} type="file" accept={AUDIO_EXTENSIONS.map((extension) => `.${extension}`).join(",")} multiple hidden
       onChange={(event) => { send(Array.from(event.target.files ?? [])); event.target.value = ""; }} />
+
+    {!compact && <div className="mt-2 space-y-2">
+      <textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={4000}
+        className="field min-h-[60px] resize-y !py-2 text-sm"
+        placeholder="Description — what it is, what you want back, who it's for. Applied to everything you drop next." />
+      <button type="button" onClick={() => setAllowDownload((on) => !on)}
+        className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition"
+        style={{ background: "var(--panel)" }}
+        aria-pressed={allowDownload}>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+          style={{
+            background: allowDownload ? "rgb(var(--accent-rgb) / 0.18)" : "rgb(var(--muted-rgb) / 0.14)",
+            color: allowDownload ? "rgb(var(--accent-rgb))" : "rgb(var(--muted-rgb))",
+          }}>
+          <Icon name={allowDownload ? "download" : "lock"} size={15} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">
+            {allowDownload ? "Downloads unlocked" : "Downloads locked"}
+          </span>
+          <span className="block text-[11px] text-muted">
+            {allowDownload
+              ? "Anyone who can hear it can download the file."
+              : "People can listen, but not keep the file. You can unlock it later."}
+          </span>
+        </span>
+        <span className="relative h-6 w-11 shrink-0 rounded-full transition"
+          style={{ background: allowDownload ? "rgb(var(--accent-rgb))" : "rgb(var(--muted-rgb) / 0.35)" }}>
+          <span className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all"
+            style={{ left: allowDownload ? 22 : 2 }} />
+        </span>
+      </button>
+    </div>}
     {jobs.length > 0 && <section className="mt-3 space-y-2" aria-label="Upload queue">
       <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-xs text-muted">
         <span role="status">{complete} added{queued ? ` · ${queued} queued` : ""}{busy ? " · Keep this page open" : " · Uploads finished"}</span>
