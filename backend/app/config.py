@@ -32,6 +32,10 @@ class Settings(BaseSettings):
         return self.data_dir / "covers"
 
     @property
+    def profiles_dir(self) -> Path:
+        return self.data_dir / "profiles"
+
+    @property
     def videos_dir(self) -> Path:
         return self.data_dir / "videos"
 
@@ -56,6 +60,7 @@ def get_settings() -> Settings:
     s.uploads_dir.mkdir(parents=True, exist_ok=True)
     s.covers_dir.mkdir(parents=True, exist_ok=True)
     s.videos_dir.mkdir(parents=True, exist_ok=True)
+    s.profiles_dir.mkdir(parents=True, exist_ok=True)
     if not s.secret_key or s.secret_key == "change-me-before-you-deploy":
         # Keep dev usable without a .env, but persist the key so that restarting
         # the server does not log everybody out.

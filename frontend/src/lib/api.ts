@@ -80,7 +80,12 @@ export type Theme = {
   performance: "auto" | "high" | "low";
   /** 0 keeps the background behind the glass, 1 brings it forward. */
   background_boost: number;
+  /** Typeface for headings and the wordmark. */
+  font: string;
 };
+
+export type Badge = { id: string; label: string; hint: string };
+export type ProfileLink = { label: string; url: string };
 
 export type User = {
   id: string;
@@ -88,12 +93,20 @@ export type User = {
   handle: string;
   display_name: string;
   avatar_url: string | null;
+  banner_url: string;
   bio: string;
+  pronouns: string;
+  links: ProfileLink[];
+  profile_accent: string;
   theme: Theme;
   created_at: string;
 };
 
-export type PublicUser = Omit<User, "email" | "created_at">;
+export type PublicUser = Omit<User, "email" | "created_at"> & {
+  badges: Badge[];
+};
+
+export type FollowState = { following: boolean; followers: number; follows: number };
 
 export type TrackStatus = "demo" | "in_progress" | "in_review" | "approved";
 

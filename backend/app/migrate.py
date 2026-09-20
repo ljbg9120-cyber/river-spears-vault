@@ -25,6 +25,15 @@ ADDITIONS: dict[str, dict[str, str]] = {
         "version_number": "INTEGER NOT NULL DEFAULT 1",
         "revision_note": "TEXT NOT NULL DEFAULT ''",
     },
+    "users": {
+        "avatar_name": "VARCHAR(80)",
+        "banner_name": "VARCHAR(80)",
+        "pronouns": "VARCHAR(40) NOT NULL DEFAULT ''",
+        # A JSON column added later is NULL on existing rows, which is not a
+        # list; BACKFILL below fixes those.
+        "links": "TEXT",
+        "profile_accent": "VARCHAR(16) NOT NULL DEFAULT ''",
+    },
     "folders": {
         "cover_name": "VARCHAR(64)",
         "showcased": "BOOLEAN NOT NULL DEFAULT 0",
@@ -33,6 +42,12 @@ ADDITIONS: dict[str, dict[str, str]] = {
         "resolved": "BOOLEAN NOT NULL DEFAULT 0",
         "resolved_at": "DATETIME",
     },
+}
+
+
+# column -> value to write wherever an added column is still NULL.
+BACKFILL: dict[str, dict[str, str]] = {
+    "users": {"links": "'[]'"},
 }
 
 
@@ -52,5 +67,20 @@ def run(engine: Engine) -> list[str]:
                 conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
                 applied.append(f"{table}.{column}")
                 log.info("added column %s.%s", table, column)
+
+    # Newly added columns start NULL on existing rows. Anything typed as a
+    # list or object in the API needs a real value or responses fail to
+    # validate for everyone who signed up before the migration.
+    with engine.begin() as conn:
+        for table, columns in BACKFILL.items():
+            if table not in existing_tables:
+                continue
+            for column, value in columns.items():
+                present = {c["name"] for c in inspect(engine).get_columns(table)}
+                if column not in present:
+                    continue
+                conn.execute(
+                    text(f"UPDATE {table} SET {column} = {value} WHERE {column} IS NULL")
+                )
 
     return applied

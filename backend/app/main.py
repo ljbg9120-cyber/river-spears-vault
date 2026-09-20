@@ -12,7 +12,8 @@ from . import align, audio, migrate
 from .config import ROOT, get_settings
 from .db import Base, engine
 from .routers import (
-    auth, comments, folders, share, showcase, tracks, users, videos, workflow,
+    auth, comments, folders, profiles, share, showcase, tracks, users,
+    videos, workflow,
 )
 
 settings = get_settings()
@@ -44,6 +45,7 @@ app.include_router(comments.router)
 app.include_router(share.router)
 app.include_router(videos.router)
 app.include_router(showcase.router)
+app.include_router(profiles.router)
 app.include_router(workflow.router)
 
 

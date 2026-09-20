@@ -76,3 +76,90 @@ def delete_cover(dest_dir: Path, base: str | None) -> None:
         return
     for path in cover_paths(dest_dir, base):
         path.unlink(missing_ok=True)
+
+
+# --- profile pictures and banners -----------------------------------------
+
+AVATAR_SIZE = 512
+BANNER_W, BANNER_H = 1500, 500
+MAX_ANIMATED_BYTES = 8 * 1024 * 1024
+
+
+def _is_animated(image: Image.Image) -> bool:
+    return getattr(image, "n_frames", 1) > 1
+
+
+def save_avatar(data: bytes, dest_dir: Path) -> str:
+    """Square profile picture. Animated GIFs stay animated.
+
+    Re-encoding an animated GIF frame by frame loses quality and often looks
+    worse than the original, so a reasonably sized one is kept byte for byte.
+    Anything else is flattened and cropped like a cover.
+    """
+    if len(data) > MAX_SOURCE_BYTES:
+        raise ImageError("That image is over 25 MB. Try a smaller one.")
+
+    try:
+        image = Image.open(io.BytesIO(data))
+        image.load()
+    except (UnidentifiedImageError, OSError) as exc:
+        raise ImageError("That file is not an image Vault can read.") from exc
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    base = uuid.uuid4().hex
+
+    if _is_animated(image) and len(data) <= MAX_ANIMATED_BYTES:
+        if max(image.size) > 1024:
+            raise ImageError("Animated avatars need to be 1024px or smaller.")
+        (dest_dir / f"{base}.gif").write_bytes(data)
+        return f"{base}.gif"
+
+    image = ImageOps.exif_transpose(image)
+    if image.mode in ("RGBA", "LA", "P"):
+        image = image.convert("RGBA")
+        backdrop = Image.new("RGB", image.size, (11, 10, 18))
+        backdrop.paste(image, mask=image.split()[-1])
+        image = backdrop
+    else:
+        image = image.convert("RGB")
+
+    square = ImageOps.fit(image, (AVATAR_SIZE, AVATAR_SIZE), Image.LANCZOS, centering=(0.5, 0.5))
+    square.save(dest_dir / f"{base}.jpg", "JPEG", quality=JPEG_QUALITY, optimize=True)
+    return f"{base}.jpg"
+
+
+def save_banner(data: bytes, dest_dir: Path) -> str:
+    """Wide header image, cropped to a 3:1 strip."""
+    if len(data) > MAX_SOURCE_BYTES:
+        raise ImageError("That image is over 25 MB. Try a smaller one.")
+
+    try:
+        image = Image.open(io.BytesIO(data))
+        image.load()
+    except (UnidentifiedImageError, OSError) as exc:
+        raise ImageError("That file is not an image Vault can read.") from exc
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    base = uuid.uuid4().hex
+
+    if _is_animated(image) and len(data) <= MAX_ANIMATED_BYTES:
+        (dest_dir / f"{base}.gif").write_bytes(data)
+        return f"{base}.gif"
+
+    image = ImageOps.exif_transpose(image)
+    if image.mode in ("RGBA", "LA", "P"):
+        image = image.convert("RGBA")
+        backdrop = Image.new("RGB", image.size, (11, 10, 18))
+        backdrop.paste(image, mask=image.split()[-1])
+        image = backdrop
+    else:
+        image = image.convert("RGB")
+
+    strip = ImageOps.fit(image, (BANNER_W, BANNER_H), Image.LANCZOS, centering=(0.5, 0.5))
+    strip.save(dest_dir / f"{base}.jpg", "JPEG", quality=JPEG_QUALITY, optimize=True)
+    return f"{base}.jpg"
+
+
+def delete_profile_image(dest_dir: Path, name: str | None) -> None:
+    if name:
+        (dest_dir / name).unlink(missing_ok=True)

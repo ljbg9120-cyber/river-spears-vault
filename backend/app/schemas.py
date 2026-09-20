@@ -10,6 +10,11 @@ TrackStatus = Literal["demo", "in_progress", "in_review", "approved"]
 TrackSort = Literal["recent", "oldest", "title", "longest", "plays", "updated"]
 
 
+def _as_list(value):
+    """A JSON column added by migration is NULL on older rows."""
+    return [] if value is None else value
+
+
 class OutputModel(BaseModel):
     @field_validator("*", mode="after")
     @classmethod
@@ -49,10 +54,16 @@ class UserOut(OutputModel):
     email: str
     handle: str
     display_name: str
-    avatar_url: str | None = None
+    avatar_url: str | None = Field(default=None, validation_alias="avatar_src")
+    banner_url: str = Field(default="", validation_alias="banner_src")
     bio: str = ""
+    pronouns: str = ""
+    links: list[dict] = []
+    profile_accent: str = ""
     theme: dict = {}
     created_at: datetime
+
+    _links_null = field_validator("links", mode="before")(_as_list)
 
     class Config:
         from_attributes = True
@@ -62,8 +73,16 @@ class PublicUser(BaseModel):
     id: str
     handle: str
     display_name: str
-    avatar_url: str | None = None
+    # Reads the model's avatar_src, so an uploaded picture wins automatically.
+    avatar_url: str | None = Field(default=None, validation_alias="avatar_src")
+    banner_url: str = Field(default="", validation_alias="banner_src")
     bio: str = ""
+    pronouns: str = ""
+    links: list[dict] = []
+    profile_accent: str = ""
+    badges: list[dict] = []
+
+    _links_null = field_validator("links", mode="before")(_as_list)
     theme: dict = {}
 
     class Config:
@@ -273,6 +292,9 @@ class ProfilePatch(BaseModel):
     display_name: str | None = Field(default=None, min_length=1, max_length=80)
     bio: str | None = Field(default=None, max_length=500)
     handle: str | None = Field(default=None, min_length=2, max_length=24)
+    pronouns: str | None = Field(default=None, max_length=40)
+    links: list[dict] | None = None
+    profile_accent: str | None = Field(default=None, pattern=r"^(#[0-9a-fA-F]{6})?$")
 
 
 class ThemePatch(BaseModel):
@@ -294,6 +316,7 @@ class ThemePatch(BaseModel):
     skip_silence: bool | None = None
     performance: str | None = None
     background_boost: float | None = Field(default=None, ge=0, le=1)
+    font: str | None = None
     mode: str | None = None
 
     @field_validator("mode")
@@ -364,3 +387,9 @@ class ShowcaseItem(BaseModel):
     stream_url: str = ""
     track_count: int = 0
     tags: list[str] = []
+
+
+class FollowState(BaseModel):
+    following: bool
+    followers: int
+    follows: int

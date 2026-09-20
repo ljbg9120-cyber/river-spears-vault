@@ -274,3 +274,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
 :root[data-perf="low"] .chip {
   transition-property: transform, opacity, background-color, color !important;
 }
+
+/* The chosen typeface drives headings and the wordmark. Falls back to Outfit,
+   which is bundled, so nothing flashes unstyled while a webfont loads. */
+.font-display,
+.title-xl {
+  font-family: var(--font-display, "Outfit"), Outfit, system-ui, sans-serif;
+}

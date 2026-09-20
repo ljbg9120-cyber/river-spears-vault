@@ -8,7 +8,7 @@ import { BACKGROUNDS } from "../components/Background";
 import Visualizer, { VISUALIZERS } from "../components/Visualizer";
 import VideoLibrary from "../components/VideoLibrary";
 import { Icon, useToast } from "../components/ui";
-import type { Theme } from "../lib/api";
+import { api, type Theme } from "../lib/api";
 import { useAuth } from "../lib/store";
 
 const PALETTES: { name: string; accent: string; accent2: string }[] = [
@@ -25,6 +25,7 @@ const PALETTES: { name: string; accent: string; accent2: string }[] = [
 export default function Appearance() {
   const { theme, previewTheme, saveTheme } = useAuth();
   const toast = useToast();
+  const [fonts, setFonts] = useState<string[]>(["Outfit"]);
   const [saving, setSaving] = useState(false);
   const timer = useRef<number>();
 
@@ -54,6 +55,10 @@ export default function Appearance() {
   };
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  useEffect(() => {
+    api.get<string[]>("/api/fonts").then(setFonts).catch(() => {});
+  }, []);
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -207,6 +212,40 @@ export default function Appearance() {
       >
         <VideoLibrary theme={theme} onPick={(patch) => commit(patch)} />
       </Section>
+
+      {/* ------------------------- typeface ------------------------- */}
+      <Section
+        title="Typeface"
+        hint="Sets headings and the wordmark. Each one loads only if you pick it."
+      >
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {fonts.map((name) => {
+            const active = (theme.font ?? "Outfit") === name;
+            return (
+              <button
+                key={name}
+                onMouseEnter={() => previewTheme({ font: name })}
+                onMouseLeave={() => previewTheme({ font: theme.font })}
+                onClick={() => commit({ font: name }, `${name} applied`)}
+                className="card px-3 py-3 text-left"
+                style={{
+                  borderColor: active ? "rgb(var(--accent-rgb))" : undefined,
+                  background: active ? "rgb(var(--accent-rgb) / 0.1)" : undefined,
+                }}
+              >
+                <span
+                  className="block truncate text-lg font-bold"
+                  style={{ fontFamily: `"${name}", Outfit, sans-serif` }}
+                >
+                  Aa
+                </span>
+                <span className="mt-0.5 block truncate text-[11px] text-muted">{name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Section>
+
 
       {/* ------------------------- colours ------------------------- */}
       <Section title="Colours" hint="Pick a pair, or dial in exact hex values.">

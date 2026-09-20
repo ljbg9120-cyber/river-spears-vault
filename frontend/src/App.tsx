@@ -15,6 +15,7 @@ import TrackPage from "./pages/TrackPage";
 import Feedback from "./pages/Feedback";
 import Playback from "./pages/Playback";
 import Showcase from "./pages/Showcase";
+import People from "./pages/People";
 
 function Protected({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -84,6 +85,7 @@ export default function App() {
                 />
                 {/* Public on purpose: the point is that anyone can hear it. */}
                 <Route path="/showcase" element={<Showcase />} />
+                <Route path="/people" element={<People />} />
                 <Route
                   path="/shares"
                   element={

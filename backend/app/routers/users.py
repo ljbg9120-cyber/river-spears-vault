@@ -75,6 +75,10 @@ def update_theme(
         raise HTTPException(422, f"Unknown background: {data['background']}")
     if "visualizer" in data and data["visualizer"] not in VISUALIZERS:
         raise HTTPException(422, f"Unknown visualizer: {data['visualizer']}")
+    from .profiles import FONTS
+
+    if "font" in data and data["font"] not in FONTS:
+        raise HTTPException(422, "Unknown font: " + str(data["font"]))
     if "video_fit" in data and data["video_fit"] not in {"cover", "contain"}:
         raise HTTPException(422, "video_fit must be cover or contain")
     if data.get("video_id"):
@@ -121,8 +125,13 @@ def public_profile(
         .order_by(Track.created_at.desc())
         .all()
     )
+    from .profiles import badges_for, follow_state
+
+    profile = PublicUser.model_validate(user, from_attributes=True)
+    profile.badges = badges_for(db, user)
     return {
-        "user": PublicUser.model_validate(user, from_attributes=True),
+        "user": profile,
+        "follow": follow_state(db, user, viewer).model_dump(),
         "tracks": [track_out(db, t, viewer) for t in tracks],
         "is_me": viewer is not None and viewer.id == user.id,
     }

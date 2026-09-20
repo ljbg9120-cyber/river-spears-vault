@@ -24,6 +24,7 @@ export default function Shell({ children }: { children: React.ReactNode }) {
     { to: "/feedback", label: "Review inbox", icon: "comment" as const },
     { to: "/shares", label: "Shared links", icon: "link" as const },
     { to: "/showcase", label: "Showcase", icon: "sparkles" as const },
+    { to: "/people", label: "People", icon: "user" as const },
     { to: "/playback", label: "Playback", icon: "volume" as const },
     { to: "/appearance", label: "Appearance", icon: "settings" as const },
   ];

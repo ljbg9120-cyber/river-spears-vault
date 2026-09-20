@@ -33,6 +33,7 @@ export const DEFAULT_THEME: Theme = {
   skip_silence: true,
   performance: "auto",
   background_boost: 0,
+  font: "Outfit",
 };
 
 export function hexToRgb(hex: string): string {
@@ -54,6 +55,26 @@ export function applyTheme(theme: Theme) {
   // out of its way: thinner panels and a lighter vignette let it through.
   const boost = Math.max(0, Math.min(1, theme.background_boost ?? 0));
   root.style.setProperty("--bg-boost", String(boost));
+
+  // Fonts load on demand: one stylesheet element, swapped when the choice
+  // changes, so an unused typeface is never fetched.
+  const font = theme.font || "Outfit";
+  root.style.setProperty("--font-display", `"${font}"`);
+  if (font !== "Outfit") {
+    const id = "vault-font";
+    let link = document.getElementById(id) as HTMLLinkElement | null;
+    const href =
+      "https://fonts.googleapis.com/css2?family=" +
+      encodeURIComponent(font).replace(/%20/g, "+") +
+      ":wght@400;600;700;800&display=swap";
+    if (!link) {
+      link = document.createElement("link");
+      link.id = id;
+      link.rel = "stylesheet";
+      document.head.appendChild(link);
+    }
+    if (link.href !== href) link.href = href;
+  }
   const light = theme.mode === "light";
   const base = light ? 0.66 : 0.045;
   const strong = light ? 0.85 : 0.075;

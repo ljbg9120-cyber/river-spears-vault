@@ -61,6 +61,9 @@ DEFAULT_THEME: dict = {
     # 0 leaves the background behind the glass; 1 pushes it forward, thins
     # the panels and lifts the vignette so it becomes the main event.
     "background_boost": 0.0,
+    # Typeface for headings and the wordmark. Loaded on demand, so an
+    # unused font costs nothing.
+    "font": "Outfit",
 }
 
 
@@ -76,8 +79,18 @@ class User(Base):
     google_sub: Mapped[str | None] = mapped_column(
         String(64), unique=True, index=True, default=None
     )
+    # From Google, when they signed in that way.
     avatar_url: Mapped[str | None] = mapped_column(String(500), default=None)
+    # An uploaded avatar wins over the Google one. Animated GIFs are kept
+    # animated rather than flattened, which is half the appeal.
+    avatar_name: Mapped[str | None] = mapped_column(String(80), default=None)
+    banner_name: Mapped[str | None] = mapped_column(String(80), default=None)
     bio: Mapped[str] = mapped_column(Text, default="")
+    pronouns: Mapped[str] = mapped_column(String(40), default="")
+    # [{"label": "Instagram", "url": "https://..."}], shown on the profile.
+    links: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    # Hex colour behind the avatar and name. Empty falls back to the theme.
+    profile_accent: Mapped[str] = mapped_column(String(16), default="")
     # Appearance: which animated background plays, accent colour, motion amount.
     # Travels with every page this user shares, so listeners see their vibe.
     theme: Mapped[dict] = mapped_column(JSON, default=lambda: dict(DEFAULT_THEME))
@@ -89,6 +102,19 @@ class User(Base):
     folders: Mapped[list["Folder"]] = relationship(
         back_populates="owner", cascade="all, delete-orphan"
     )
+
+    @property
+    def avatar_src(self) -> str | None:
+        """An uploaded picture beats the one Google supplied."""
+        if self.avatar_name:
+            return f"/api/u/{self.handle}/avatar?v={self.avatar_name[:8]}"
+        return self.avatar_url
+
+    @property
+    def banner_src(self) -> str:
+        if self.banner_name:
+            return f"/api/u/{self.handle}/banner?v={self.banner_name[:8]}"
+        return ""
 
 
 class Folder(Base):
@@ -256,6 +282,24 @@ class LibraryView(Base):
     filters: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
+
+
+class Follow(Base):
+    """One person following another. Nobody follows themselves."""
+
+    __tablename__ = "follows"
+    __table_args__ = (
+        UniqueConstraint("follower_id", "following_id", name="uq_follow"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uid)
+    follower_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    following_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
 class Rating(Base):
