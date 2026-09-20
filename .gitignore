@@ -8,3 +8,6 @@ data/uploads/
 data/*.db
 data/*.db-journal
 .DS_Store
+
+# Downloaded tooling, not source. tunnel.ps1 fetches this on demand.
+tools/
