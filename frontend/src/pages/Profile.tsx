@@ -3,12 +3,13 @@ import { motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import TrackRow from "../components/TrackRow";
+import { ProfileEffectLayer, frameRadius, frameStyle } from "../components/ProfileDecor";
 import { Avatar, Empty, Icon, Modal, Spinner, useToast } from "../components/ui";
 import {
-  api, formatDate, type FollowState, type ProfileLink,
-  type PublicUser, type Track, type User,
+  api, AVATAR_FRAMES, PROFILE_EFFECTS, type AvatarFrame, type FollowState,
+  type ProfileEffect, type ProfileLink, type PublicUser, type Track, type User,
 } from "../lib/api";
-import { useAuth } from "../lib/store";
+import { useAuth, usePlayer } from "../lib/store";
 
 type ProfileData = {
   user: PublicUser;
@@ -20,6 +21,7 @@ type ProfileData = {
 export default function Profile() {
   const { handle } = useParams<{ handle: string }>();
   const { user, setUser } = useAuth();
+  const { current, playing, play } = usePlayer();
   const toast = useToast();
 
   const [data, setData] = useState<ProfileData | null>(null);
@@ -62,6 +64,7 @@ export default function Profile() {
 
   const p = data.user;
   const accent = p.profile_accent || "rgb(var(--accent-rgb))";
+  const accent2 = p.profile_accent2 || "rgb(var(--accent2-rgb))";
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -76,12 +79,22 @@ export default function Profile() {
           style={{
             background: p.banner_url
               ? undefined
-              : `linear-gradient(120deg, ${accent}, rgb(var(--accent2-rgb)))`,
+              : `linear-gradient(120deg, ${accent}, ${accent2})`,
           }}
         >
           {p.banner_url && (
-            <img src={p.banner_url} alt="" className="h-full w-full object-cover" />
+            <img
+              src={p.banner_url}
+              alt=""
+              className="h-full w-full object-cover"
+              style={{ objectPosition: `center ${p.banner_focus ?? "center"}` }}
+            />
           )}
+          <ProfileEffectLayer
+            effect={p.profile_effect ?? "none"}
+            accent={accent}
+            accent2={accent2}
+          />
           {data.is_me && (
             <button
               onClick={() => setEditing(true)}
@@ -94,13 +107,18 @@ export default function Profile() {
         </div>
 
         {/* ---- identity ---- */}
-        <div className="px-5 pb-5 sm:px-7 sm:pb-7">
+        <div className="relative z-10 px-5 pb-5 sm:px-7 sm:pb-7">
           <div className="-mt-12 flex items-end justify-between gap-4 sm:-mt-14">
             <span
-              className="rounded-full p-1"
-              style={{ background: "rgb(var(--bg-rgb))" }}
+              className="inline-flex"
+              style={frameStyle(p.avatar_frame ?? "none", accent, accent2)}
             >
-              <Avatar name={p.display_name} src={p.avatar_url} size={96} />
+              <Avatar
+                name={p.display_name}
+                src={p.avatar_url}
+                size={96}
+                radius={frameRadius(p.avatar_frame ?? "none")}
+              />
             </span>
 
             {!data.is_me && (
@@ -116,7 +134,21 @@ export default function Profile() {
           </div>
 
           <div className="mt-3">
-            <h1 className="title-xl text-2xl sm:text-3xl">
+            <h1
+              className="title-xl text-2xl sm:text-3xl"
+              style={
+                p.profile_accent2
+                  ? {
+                      backgroundImage: `linear-gradient(100deg, ${accent}, ${p.profile_accent2})`,
+                      WebkitBackgroundClip: "text",
+                      backgroundClip: "text",
+                      color: "transparent",
+                    }
+                  : p.profile_accent
+                    ? { color: p.profile_accent }
+                    : undefined
+              }
+            >
               {p.display_name}
               {p.pronouns && (
                 <span className="ml-2 align-middle text-sm font-medium text-muted">
@@ -125,6 +157,11 @@ export default function Profile() {
               )}
             </h1>
             <p className="text-sm text-muted">@{p.handle}</p>
+            {p.status_text && (
+              <p className="mt-1 text-sm" style={{ color: accent }}>
+                {p.status_text}
+              </p>
+            )}
           </div>
 
           {p.bio && (
@@ -178,6 +215,38 @@ export default function Profile() {
         </div>
       </motion.div>
 
+      {(() => {
+        const song = data.tracks.find((t) => t.id === p.profile_song_id);
+        if (!song) return null;
+        const isCurrent = current?.id === song.id;
+        // Autoplay with sound is blocked by every browser, so this is a
+        // deliberate button rather than something that silently fails.
+        return (
+          <motion.button
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            onClick={() => play(song, data.tracks)}
+            className="card mt-4 flex w-full items-center gap-3 p-3 text-left"
+            style={{ borderColor: `${accent}66` }}
+          >
+            <span
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white"
+              style={{ background: `linear-gradient(135deg, ${accent}, ${accent2})` }}
+            >
+              <Icon name={isCurrent && playing ? "pause" : "play"} size={20} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[11px] uppercase tracking-wider text-muted">
+                {p.display_name.split(" ")[0]}&rsquo;s pick
+              </span>
+              <span className="block truncate font-display text-[15px] font-bold">
+                {song.title}
+              </span>
+            </span>
+          </motion.button>
+        );
+      })()}
+
       <div className="mt-4">
         {data.tracks.length === 0 ? (
           <Empty
@@ -227,8 +296,21 @@ function EditProfile({
   const [links, setLinks] = useState<ProfileLink[]>(
     ((user as unknown as PublicUser).links ?? []).slice(0, 5),
   );
+  const me = user as unknown as PublicUser;
+  const [accent2, setAccent2] = useState(me.profile_accent2 ?? "");
+  const [status, setStatus] = useState(me.status_text ?? "");
+  const [effect, setEffect] = useState<ProfileEffect>(me.profile_effect ?? "none");
+  const [frame, setFrame] = useState<AvatarFrame>(me.avatar_frame ?? "none");
+  const [focus, setFocus] = useState(me.banner_focus ?? "center");
+  const [songId, setSongId] = useState<string | null>(me.profile_song_id ?? null);
+  const [myTracks, setMyTracks] = useState<Track[]>([]);
   const [uploading, setUploading] = useState<"avatar" | "banner" | null>(null);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    api.get<Track[]>("/api/tracks?limit=200").then(setMyTracks).catch(() => {});
+  }, [open]);
 
   const sendImage = async (kind: "avatar" | "banner", file: File) => {
     setUploading(kind);
@@ -262,6 +344,12 @@ function EditProfile({
         bio,
         pronouns: pronouns.trim(),
         profile_accent: accent,
+        profile_accent2: accent2,
+        status_text: status.trim(),
+        profile_effect: effect,
+        avatar_frame: frame,
+        banner_focus: focus,
+        profile_song_id: songId,
         links: links.filter((l) => l.url.trim()),
       }));
       onClose();
@@ -359,6 +447,86 @@ function EditProfile({
             )}
           </div>
         </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1 block text-xs uppercase tracking-wider text-muted">
+              Second colour
+            </span>
+            <input type="color" className="field !h-[46px] !p-1"
+              value={accent2 || "#22d3ee"} onChange={(e) => setAccent2(e.target.value)} />
+            <span className="mt-1 block text-[11px] text-muted">
+              Makes your name a gradient between the two.
+            </span>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs uppercase tracking-wider text-muted">
+              Status
+            </span>
+            <input className="field" value={status} maxLength={80}
+              placeholder="working on the album"
+              onChange={(e) => setStatus(e.target.value)} />
+          </label>
+        </div>
+
+        <div>
+          <span className="mb-1.5 block text-xs uppercase tracking-wider text-muted">
+            Banner effect
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {PROFILE_EFFECTS.map((e) => (
+              <button key={e.id} onClick={() => setEffect(e.id)}
+                className={`chip ${effect === e.id ? "chip-on" : ""}`}>
+                {e.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <span className="mb-1.5 block text-xs uppercase tracking-wider text-muted">
+            Picture frame
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {AVATAR_FRAMES.map((f) => (
+              <button key={f.id} onClick={() => setFrame(f.id)}
+                className={`chip ${frame === f.id ? "chip-on" : ""}`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <span className="mb-1.5 block text-xs uppercase tracking-wider text-muted">
+            Banner focus
+          </span>
+          <div className="flex flex-wrap gap-1.5">
+            {(["top", "center", "bottom"] as const).map((f) => (
+              <button key={f} onClick={() => setFocus(f)}
+                className={`chip ${focus === f ? "chip-on" : ""}`}>
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <label className="block">
+          <span className="mb-1 block text-xs uppercase tracking-wider text-muted">
+            Profile song
+          </span>
+          <select className="field" value={songId ?? ""}
+            onChange={(e) => setSongId(e.target.value || null)}>
+            <option value="" style={{ color: "#111" }}>None</option>
+            {myTracks.map((t) => (
+              <option key={t.id} value={t.id} style={{ color: "#111" }}>{t.title}</option>
+            ))}
+          </select>
+          <span className="mt-1 block text-[11px] text-muted">
+            Plays when someone opens your profile. Choosing one makes that track
+            public so visitors can actually hear it.
+          </span>
+        </label>
 
         {error && <p className="text-sm" style={{ color: "#ff8098" }}>{error}</p>}
         <button onClick={save} className="btn-primary w-full">Save profile</button>

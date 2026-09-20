@@ -33,6 +33,13 @@ ADDITIONS: dict[str, dict[str, str]] = {
         # list; BACKFILL below fixes those.
         "links": "TEXT",
         "profile_accent": "VARCHAR(16) NOT NULL DEFAULT ''",
+        "profile_accent2": "VARCHAR(16) NOT NULL DEFAULT ''",
+        "profile_song_id": "VARCHAR(32)",
+        "profile_effect": "VARCHAR(16) NOT NULL DEFAULT 'none'",
+        "avatar_frame": "VARCHAR(16) NOT NULL DEFAULT 'none'",
+        "banner_focus": "VARCHAR(10) NOT NULL DEFAULT 'center'",
+        "profile_layout": "VARCHAR(10) NOT NULL DEFAULT 'card'",
+        "status_text": "VARCHAR(80) NOT NULL DEFAULT ''",
     },
     "folders": {
         "cover_name": "VARCHAR(64)",

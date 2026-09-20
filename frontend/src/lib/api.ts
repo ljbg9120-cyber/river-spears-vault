@@ -84,6 +84,27 @@ export type Theme = {
   font: string;
 };
 
+export type ProfileEffect =
+  | "none" | "notes" | "sparkles" | "confetti" | "rain" | "embers";
+export type AvatarFrame = "none" | "ring" | "glow" | "vinyl" | "square";
+
+export const PROFILE_EFFECTS: { id: ProfileEffect; label: string }[] = [
+  { id: "none", label: "None" },
+  { id: "notes", label: "Floating notes" },
+  { id: "sparkles", label: "Sparkles" },
+  { id: "confetti", label: "Confetti" },
+  { id: "rain", label: "Rain" },
+  { id: "embers", label: "Embers" },
+];
+
+export const AVATAR_FRAMES: { id: AvatarFrame; label: string }[] = [
+  { id: "none", label: "Plain" },
+  { id: "ring", label: "Ring" },
+  { id: "glow", label: "Glow" },
+  { id: "vinyl", label: "Vinyl" },
+  { id: "square", label: "Square" },
+];
+
 export type Badge = { id: string; label: string; hint: string };
 export type ProfileLink = { label: string; url: string };
 
@@ -98,6 +119,15 @@ export type User = {
   pronouns: string;
   links: ProfileLink[];
   profile_accent: string;
+  /** When set, the display name is a gradient between the two accents. */
+  profile_accent2: string;
+  /** A track of theirs that plays when someone opens the profile. */
+  profile_song_id: string | null;
+  profile_effect: ProfileEffect;
+  avatar_frame: AvatarFrame;
+  banner_focus: "top" | "center" | "bottom";
+  profile_layout: "card" | "wide";
+  status_text: string;
   theme: Theme;
   created_at: string;
 };

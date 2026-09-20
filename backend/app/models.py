@@ -91,6 +91,20 @@ class User(Base):
     links: Mapped[list[dict]] = mapped_column(JSON, default=list)
     # Hex colour behind the avatar and name. Empty falls back to the theme.
     profile_accent: Mapped[str] = mapped_column(String(16), default="")
+    # Second colour; when set, the display name is a gradient between the two.
+    profile_accent2: Mapped[str] = mapped_column(String(16), default="")
+    # A track of theirs that plays when someone opens the profile.
+    profile_song_id: Mapped[str | None] = mapped_column(String(32), default=None)
+    # Decorative overlay: none | notes | sparkles | confetti | rain | embers
+    profile_effect: Mapped[str] = mapped_column(String(16), default="none")
+    # Treatment around the picture: none | ring | glow | vinyl | square
+    avatar_frame: Mapped[str] = mapped_column(String(16), default="none")
+    # Which part of a tall banner to show: top | center | bottom
+    banner_focus: Mapped[str] = mapped_column(String(10), default="center")
+    # card = contained, wide = full-bleed banner across the page
+    profile_layout: Mapped[str] = mapped_column(String(10), default="card")
+    # One line under the name, like "working on the album".
+    status_text: Mapped[str] = mapped_column(String(80), default="")
     # Appearance: which animated background plays, accent colour, motion amount.
     # Travels with every page this user shares, so listeners see their vibe.
     theme: Mapped[dict] = mapped_column(JSON, default=lambda: dict(DEFAULT_THEME))

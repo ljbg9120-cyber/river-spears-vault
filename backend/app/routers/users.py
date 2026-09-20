@@ -48,6 +48,28 @@ def update_profile(
             raise HTTPException(409, f"@{handle} is taken.")
         data["handle"] = handle
 
+    # Each of these is a fixed set, so a typo cannot leave a profile rendering
+    # nothing at all.
+    choices = {
+        "profile_effect": {"none", "notes", "sparkles", "confetti", "rain", "embers"},
+        "avatar_frame": {"none", "ring", "glow", "vinyl", "square"},
+        "banner_focus": {"top", "center", "bottom"},
+        "profile_layout": {"card", "wide"},
+    }
+    for field, allowed in choices.items():
+        if field in data and data[field] not in allowed:
+            raise HTTPException(422, f"{field} must be one of: {', '.join(sorted(allowed))}")
+
+    if data.get("profile_song_id"):
+        from ..models import Track
+
+        song = db.get(Track, data["profile_song_id"])
+        if song is None or song.owner_id != user.id:
+            raise HTTPException(404, "That track no longer exists.")
+        # A profile song plays to strangers, so it has to be one.
+        if song.visibility == "private":
+            song.visibility = "public"
+
     for field, value in data.items():
         setattr(user, field, value)
     db.commit()

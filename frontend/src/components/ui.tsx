@@ -12,10 +12,13 @@ export function Avatar({
   name,
   src,
   size = 36,
+  radius,
 }: {
   name: string;
   src?: string | null;
   size?: number;
+  /** Corner radius in pixels; omit for a circle. */
+  radius?: number;
 }) {
   const initials = name
     .split(/\s+/)
@@ -28,17 +31,18 @@ export function Avatar({
         src={src}
         alt={name}
         referrerPolicy="no-referrer"
-        className="rounded-full object-cover"
-        style={{ width: size, height: size }}
+        className="object-cover"
+        style={{ width: size, height: size, borderRadius: radius ?? 999 }}
       />
     );
   }
   return (
     <div
-      className="flex items-center justify-center rounded-full font-display font-bold text-white"
+      className="flex items-center justify-center font-display font-bold text-white"
       style={{
         width: size,
         height: size,
+        borderRadius: radius ?? 999,
         fontSize: size * 0.38,
         background: "linear-gradient(135deg, rgb(var(--accent-rgb)), rgb(var(--accent2-rgb)))",
       }}

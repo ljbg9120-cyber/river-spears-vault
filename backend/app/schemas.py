@@ -60,6 +60,13 @@ class UserOut(OutputModel):
     pronouns: str = ""
     links: list[dict] = []
     profile_accent: str = ""
+    profile_accent2: str = ""
+    profile_song_id: str | None = None
+    profile_effect: str = "none"
+    avatar_frame: str = "none"
+    banner_focus: str = "center"
+    profile_layout: str = "card"
+    status_text: str = ""
     theme: dict = {}
     created_at: datetime
 
@@ -80,6 +87,13 @@ class PublicUser(BaseModel):
     pronouns: str = ""
     links: list[dict] = []
     profile_accent: str = ""
+    profile_accent2: str = ""
+    profile_song_id: str | None = None
+    profile_effect: str = "none"
+    avatar_frame: str = "none"
+    banner_focus: str = "center"
+    profile_layout: str = "card"
+    status_text: str = ""
     badges: list[dict] = []
 
     _links_null = field_validator("links", mode="before")(_as_list)
@@ -295,6 +309,13 @@ class ProfilePatch(BaseModel):
     pronouns: str | None = Field(default=None, max_length=40)
     links: list[dict] | None = None
     profile_accent: str | None = Field(default=None, pattern=r"^(#[0-9a-fA-F]{6})?$")
+    profile_accent2: str | None = Field(default=None, pattern=r"^(#[0-9a-fA-F]{6})?$")
+    profile_song_id: str | None = None
+    profile_effect: str | None = None
+    avatar_frame: str | None = None
+    banner_focus: str | None = None
+    profile_layout: str | None = None
+    status_text: str | None = Field(default=None, max_length=80)
 
 
 class ThemePatch(BaseModel):
