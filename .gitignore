@@ -4,10 +4,11 @@ __pycache__/
 node_modules/
 dist/
 .env
-data/uploads/
-data/*.db
-data/*.db-journal
 .DS_Store
 
 # Downloaded tooling, not source. tunnel.ps1 fetches this on demand.
 tools/
+
+# Runtime data: database, uploads, covers, clips, logs, dev signing key.
+# None of it is source and none of it belongs in a repository.
+data/
